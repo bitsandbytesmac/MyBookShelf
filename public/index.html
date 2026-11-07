@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A cozy personal bookshelf and reading tracker.">
+
+    <title>MyBookShelf | Your Little Library</title>
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+
+            <div class="brand">
+                <span class="brand-icon">📚</span>
+                <h2>MyBookShelf</h2>
+            </div>
+
+            <p class="nav-label">MENU</p>
+
+            <nav class="navigation">
+                <a href="#" class="nav-link active" data-filter="All">
+                    <span>⌂</span> Dashboard
+                </a>
+
+                <a href="#" class="nav-link" data-filter="Reading">
+                    <span>📖</span> Currently Reading
+                </a>
+
+                <a href="#" class="nav-link" data-filter="Completed">
+                    <span>✓</span> Completed
+                </a>
+
+                <a href="#" class="nav-link" data-filter="Want to Read">
+                    <span>♡</span> Wishlist
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <p>Made with ♥ for book lovers</p>
+            </div>
+
+        </aside>
+
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- MOBILE MENU BUTTON -->
+            <button id="menuToggle" class="menu-toggle" aria-label="Open navigation">
+                ☰
+            </button>
+
+            <!-- SIDEBAR OVERLAY -->
+            <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+            <header class="topbar">
+                <div>
+                    <p class="greeting">WELCOME TO YOUR PERSONAL LIBRARY</p>
+                    <h1>Your little library.</h1>
+                    <p class="subtitle">Every book has a story. Keep yours organized.</p>
+                </div>
+
+                <div class="profile">
+                    <span>📚</span>
+                </div>
+            </header>
+
+
+            <!-- Statistics -->
+            <section class="stats-container">
+
+                <div class="stat-card">
+                    <p>Total Books</p>
+                    <h2 id="totalBooks">0</h2>
+                    <span>Books in your library</span>
+                </div>
+
+                <div class="stat-card">
+                    <p>Currently Reading</p>
+                    <h2 id="readingBooks">0</h2>
+                    <span>Your ongoing stories</span>
+                </div>
+
+                <div class="stat-card">
+                    <p>Completed</p>
+                    <h2 id="completedBooks">0</h2>
+                    <span>Stories you've finished</span>
+                </div>
+
+                <div class="stat-card">
+                    <p>Wishlist</p>
+                    <h2 id="wishlistBooks">0</h2>
+                    <span>Books to discover</span>
+                </div>
+
+                <!-- TOTAL PAGES READ -->
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <p>Total Pages Read</p>
+                        <h2 id="totalPagesRead">0</h2>
+                    </div>
+                </div>
+
+                <!-- AVERAGE COMPLETION -->
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <p>Average Completion</p>
+                        <h2 id="averageCompletion">0%</h2>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- READING GOAL -->
+
+            <section class="reading-goal-section">
+
+                <div class="reading-goal-header">
+                    <div>
+                        <p class="section-label">YOUR YEARLY CHALLENGE</p>
+                        <h2 id="readingGoalYear">2026 Reading Goal</h2>
+                    </div>
+
+                    <div class="goal-icon">
+                        <span>🎯</span>
+                    </div>
+                </div>
+
+                <div class="reading-goal-content">
+
+                    <div class="goal-progress-info">
+                        <h3>
+                            <span id="completedGoalBooks">0</span>
+                            <span class="goal-divider">of</span>
+                            <span id="readingGoalTarget">12</span>
+                        </h3>
+
+                        <p>Books completed</p>
+                    </div>
+
+                    <div class="goal-progress-bar">
+                        <div
+                            id="readingGoalFill"
+                            class="goal-progress-fill">
+                        </div>
+                    </div>
+
+                    <div class="goal-progress-footer">
+                        <span id="readingGoalPercentage">0% completed</span>
+                        <span id="remainingGoalBooks">12 books remaining</span>
+                    </div>
+
+                    <div class="goal-settings">
+                        <label for="readingGoalInput">Set your yearly target</label>
+
+                        <div class="goal-input-group">
+                            <input
+                                type="number"
+                                id="readingGoalInput"
+                                min="1"
+                                max="365"
+                                value="12"
+                            >
+
+                            <button type="button" id="saveReadingGoalBtn">
+                                Save Goal
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- Book Collection -->
+            <section class="library-section">
+
+                <div class="section-header">
+                    <div>
+                        <p class="section-label">YOUR COLLECTION</p>
+                        <h2 id="sectionTitle">My Bookshelf</h2>
+                    </div>
+
+                    <button id="addBookBtn" class="primary-button">
+                        + Add a Book
+                    </button>
+                </div>
+
+
+                <!-- Search -->
+                <div class="toolbar">
+                    <input
+                        type="search"
+                        id="searchInput"
+                        placeholder="Search by book title or author..."
+                    >
+
+                    <select id="genreFilter">
+                        <option value="All">All Genres</option>
+                        <option value="Fiction">Fiction</option>
+                        <option value="Romance">Romance</option>
+                        <option value="Fantasy">Fantasy</option>
+                        <option value="Self-help">Self-help</option>
+                    </select>
+                </div>
+
+
+                <!-- Book Cards will be rendered here -->
+                <div id="bookContainer" class="book-grid">
+                </div>
+
+            </section>
+
+            <footer class="footer">
+                <p>MyBookShelf © 2026 · A little space for your stories.</p>
+            </footer>
+
+        </main>
+
+    </div>
+
+
+<!-- BOOK MODAL -->
+
+<div id="bookModal" class="modal hidden">
+
+    <div class="modal-content">
+
+        <div class="modal-header">
+            <div>
+                <p class="section-label">YOUR PERSONAL LIBRARY</p>
+                <h2 id="modalTitle">Add a Book</h2>
+            </div>
+
+            <button id="closeModalBtn" class="close-button">
+                &times;
+            </button>
+        </div>
+
+        <form id="bookForm">
+
+            <input type="hidden" id="bookId">
+
+            <div class="form-group">
+                <label for="bookTitle">Book Title</label>
+                <input
+                    type="text"
+                    id="bookTitle"
+                    placeholder="Enter book title"
+                    required
+>
+            </div>
+
+            <div class="form-group">
+                <label for="bookAuthor">Author</label>
+                <input
+                    type="text"
+                    id="bookAuthor"
+                    placeholder="Enter author name"
+                    required
+                >
+            </div>
+
+            <div class="form-row">
+
+                <div class="form-group">
+                    <label for="bookGenre">Genre</label>
+
+                    <select id="bookGenre">
+                        <option value="Fiction">Fiction</option>
+                        <option value="Romance">Romance</option>
+                        <option value="Fantasy">Fantasy</option>
+                        <option value="Self-help">Self-help</option>
+                        <option value="Mystery">Mystery</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="bookStatus">Reading Status</label>
+
+                    <select id="bookStatus">
+                        <option value="Want to Read">Want to Read</option>
+                        <option value="Reading">Reading</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="form-group">
+                <label for="totalPages">Total Pages</label>
+
+                <input
+                    type="number"
+                    id="totalPages"
+                    min="1"
+                    placeholder="e.g. 350"
+                >
+            </div>
+
+            
+            <div class="form-group">
+                <label for="currentPage">Current Page</label>
+                <input
+                    type="number"
+                    id="currentPage"
+                    min="0"
+                    placeholder="e.g. 120"
+                >
+            </div>
+
+
+            <div class="modal-actions">
+
+                <button type="button" id="cancelBtn" class="secondary-button">
+                    Cancel
+                </button>
+
+                <button type="submit" class="primary-button">
+                    Save Book
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<!-- PROGRESS MODAL -->
+
+<div id="progressModal" class="modal hidden">
+
+    <div class="modal-content">
+
+        <div class="modal-header">
+            <div>
+                <p class="section-label">YOUR READING JOURNEY</p>
+                <h2>Update Progress</h2>
+            </div>
+
+            <button id="closeProgressModalBtn" class="close-button">
+                &times;
+            </button>
+        </div>
+
+        <form id="progressForm">
+
+            <div class="form-group">
+                <label id="progressBookTitle">Book Title</label>
+                <label for="newCurrentPage">Current Page</label>
+                <input
+                    type="number"
+                    id="newCurrentPage"
+                    min="0"
+                    required
+                >
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" id="cancelProgressBtn">
+                    Cancel
+                </button>
+
+                <button type="submit">
+                    Save Progress
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+    <!-- JavaScript -->
+    <script src="js/app.js"></script>
+
+</body>
+</html>

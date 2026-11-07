@@ -1,0 +1,858 @@
+/* =========================
+   GLOBAL STYLES
+========================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'DM Sans', sans-serif;
+    background: #F8F5EF;
+    color: #44382F;
+}
+
+.app-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+
+/* =========================
+   SIDEBAR
+========================= */
+
+.sidebar {
+    width: 250px;
+    background: #EDE5D8;
+    padding: 30px 20px;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 55px;
+}
+
+.brand-icon {
+    font-size: 25px;
+}
+
+.brand h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 21px;
+}
+
+.nav-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: #9A8877;
+    margin-bottom: 15px;
+}
+
+.navigation {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.nav-link {
+    text-decoration: none;
+    color: #76695D;
+    padding: 13px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    background: #DCCBB6;
+    color: #49372A;
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    font-size: 12px;
+    color: #9A8877;
+}
+
+
+/* =========================
+   MAIN CONTENT
+========================= */
+
+.main-content {
+    flex: 1;
+    padding: 40px;
+    min-width: 0;
+}
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 35px;
+}
+
+.greeting,
+.section-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: #A18C77;
+    margin-bottom: 10px;
+}
+
+.topbar h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 38px;
+    color: #49372A;
+}
+
+.subtitle {
+    color: #958779;
+    margin-top: 8px;
+    font-size: 14px;
+}
+
+.profile {
+    background: #E8D9C5;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+}
+
+
+/* =========================
+   STATISTICS
+========================= */
+
+.stats-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 45px;
+}
+
+.stat-card {
+    background: #FFFDFA;
+    padding: 22px;
+    border: 1px solid #EEE7DC;
+    border-radius: 14px;
+}
+
+.stat-card p {
+    font-size: 13px;
+    color: #8E7D6D;
+}
+
+.stat-card h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 32px;
+    margin: 12px 0 5px;
+    color: #594333;
+}
+
+.stat-card span {
+    font-size: 11px;
+    color: #AA9B8C;
+}
+
+
+/* =========================
+   LIBRARY SECTION
+========================= */
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 25px;
+}
+
+.section-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 27px;
+}
+
+.primary-button {
+    background: #75553F;
+    color: white;
+    border: none;
+    padding: 13px 20px;
+    border-radius: 9px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: 0.2s;
+}
+
+.primary-button:hover {
+    background: #59402F;
+}
+
+
+/* =========================
+   SEARCH AND FILTER
+========================= */
+
+.toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 25px;
+}
+
+.toolbar input,
+.toolbar select {
+    padding: 13px;
+    border: 1px solid #E5DCCF;
+    border-radius: 9px;
+    background: #FFFDFA;
+    color: #594333;
+    font-family: inherit;
+    outline: none;
+}
+
+.toolbar input {
+    flex: 1;
+    min-width: 0;
+}
+
+.toolbar input:focus,
+.toolbar select:focus {
+    border-color: #A17B5C;
+}
+
+
+/* =========================
+   BOOK CARDS
+========================= */
+
+.book-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 22px;
+}
+
+.book-card {
+    background: #FFFDFA;
+    padding: 13px;
+    border: 1px solid #EEE7DC;
+    border-radius: 13px;
+    transition: transform 0.2s;
+}
+
+.book-card:hover {
+    transform: translateY(-4px);
+}
+
+.book-cover {
+    height: 205px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 15px;
+    color: #FFF9EE;
+    font-family: 'Playfair Display', serif;
+    font-size: 19px;
+    margin-bottom: 15px;
+}
+
+.cover-brown {
+    background: linear-gradient(145deg, #79543D, #38291F);
+}
+
+.cover-green {
+    background: linear-gradient(145deg, #75836A, #354638);
+}
+
+.cover-pink {
+    background: linear-gradient(145deg, #C58C83, #81504F);
+}
+
+.cover-blue {
+    background: linear-gradient(145deg, #71849B, #394B60);
+}
+
+.book-info h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    margin-bottom: 5px;
+}
+
+.book-info p {
+    font-size: 12px;
+    color: #A18C77;
+    margin-bottom: 12px;
+}
+
+.book-status {
+    display: inline-block;
+    padding: 6px 9px;
+    background: #EEE7DC;
+    color: #75553F;
+    border-radius: 20px;
+    font-size: 10px;
+}
+
+
+/* =========================
+   EMPTY STATE
+========================= */
+
+.empty-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 50px 15px;
+    color: #958779;
+}
+
+
+/* =========================
+   FOOTER
+========================= */
+
+.footer {
+    margin-top: 55px;
+    text-align: center;
+    font-size: 12px;
+    color: #AA9B8C;
+}
+
+
+/* =========================
+   RESPONSIVE DESIGN
+========================= */
+
+@media (max-width: 1100px) {
+    .book-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .stats-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        padding: 15px;
+    }
+
+    .brand {
+        margin-bottom: 15px;
+    }
+
+    .navigation {
+        flex-direction: row;
+        overflow-x: auto;
+        padding-bottom: 5px;
+    }
+
+    .nav-link {
+        white-space: nowrap;
+        font-size: 12px;
+    }
+
+    .nav-label,
+    .sidebar-footer {
+        display: none;
+    }
+
+    .main-content {
+        padding: 22px 15px;
+    }
+
+    .topbar h1 {
+        font-size: 29px;
+    }
+
+    .book-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .book-cover {
+        height: 170px;
+    }
+}
+
+@media (max-width: 420px) {
+    .stats-container {
+        gap: 10px;
+    }
+
+    .stat-card {
+        padding: 14px;
+    }
+
+    .toolbar {
+        flex-direction: column;
+    }
+
+    .section-header {
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .primary-button {
+        padding: 11px;
+        font-size: 12px;
+    }
+}
+
+/* =========================
+   BOOK MODAL
+========================= */
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(40, 30, 20, 0.55);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+    z-index: 1000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #FFFDFA;
+    width: 100%;
+    max-width: 500px;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 25px;
+}
+
+.modal-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 27px;
+}
+
+.close-button {
+    border: none;
+    background: transparent;
+    font-size: 30px;
+    cursor: pointer;
+    color: #75553F;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 18px;
+    flex: 1;
+}
+
+.form-group label {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.form-group input,
+.form-group select {
+    padding: 13px;
+    border: 1px solid #E5DCCF;
+    border-radius: 8px;
+    font-family: inherit;
+    background: white;
+    color: #594333;
+}
+
+.form-row {
+    display: flex;
+    gap: 15px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.secondary-button {
+    padding: 12px 18px;
+    background: #EEE7DC;
+    color: #594333;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+@media (max-width: 500px) {
+    .modal-content {
+        padding: 20px;
+    }
+
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+}
+
+.book-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.book-actions button {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+}
+
+.edit-button {
+    background: #EEE7DC;
+    color: #594333;
+}
+
+.delete-button {
+    background: #F5E2DC;
+    color: #A05243;
+}
+
+/* READING PROGRESS */
+
+.progress-container {
+    margin-top: 12px;
+    width: 100%;
+}
+
+.progress-container p {
+    font-size: 12px;
+    color: #8A7665;
+    margin-bottom: 7px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 7px;
+    background: #EDE5DA;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #A77B55;
+    border-radius: 20px;
+    transition: width 0.3s ease;
+}
+
+.progress-button {
+    background: #A77B55;
+    color: white;
+    border: none;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.progress-button:hover {
+    background: #8D6545;
+}
+
+/* PROGRESS MODAL BUTTONS */
+
+#progressForm .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+#progressForm .modal-actions button {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* CANCEL BUTTON */
+
+#cancelProgressBtn {
+    background: #F3EEE8;
+    color: #765B45;
+    border: 1px solid #DED2C5;
+}
+
+#cancelProgressBtn:hover {
+    background: #E8DED3;
+}
+
+/* SAVE PROGRESS BUTTON */
+
+#progressForm button[type="submit"] {
+    background: #A77B55;
+    color: #FFFFFF;
+    border: 1px solid #A77B55;
+}
+
+#progressForm button[type="submit"]:hover {
+    background: #8D6545;
+    border-color: #8D6545;
+}
+
+
+/* =========================
+   READING GOAL
+========================= */
+
+.reading-goal-section {
+    background: #FFFDFA;
+    border: 1px solid #EEE7DC;
+    border-radius: 14px;
+    padding: 25px;
+    margin-bottom: 45px;
+}
+
+.reading-goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.reading-goal-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 25px;
+    color: #49372A;
+}
+
+.goal-icon {
+    width: 45px;
+    height: 45px;
+    background: #F3EEE8;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    font-size: 23px;
+}
+
+.goal-progress-info h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px;
+    color: #594333;
+    margin-bottom: 5px;
+}
+
+.goal-divider {
+    color: #AA9B8C;
+    font-size: 18px;
+    margin: 0 5px;
+}
+
+.goal-progress-info p {
+    color: #958779;
+    font-size: 13px;
+    margin-bottom: 18px;
+}
+
+.goal-progress-bar {
+    width: 100%;
+    height: 12px;
+    background: #EDE5DA;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.goal-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #A77B55, #C49A73);
+    border-radius: 20px;
+    transition: width 0.4s ease;
+}
+
+.goal-progress-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+    color: #958779;
+    font-size: 12px;
+}
+
+.goal-settings {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #EEE7DC;
+}
+
+.goal-settings label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.goal-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.goal-input-group input {
+    width: 100px;
+    padding: 10px;
+    border: 1px solid #E5DCCF;
+    border-radius: 8px;
+    font-family: inherit;
+    color: #594333;
+}
+
+.goal-input-group button {
+    padding: 10px 16px;
+    background: #75553F;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.goal-input-group button:hover {
+    background: #59402F;
+}
+
+/* =========================
+   DASHBOARD IMPROVEMENTS
+========================= */
+
+.stats-container {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* TABLET AND MOBILE */
+@media (max-width: 768px) {
+    .reading-goal-section {
+        padding: 20px;
+    }
+
+    .reading-goal-header h2 {
+        font-size: 22px;
+    }
+
+    .goal-progress-footer {
+        flex-wrap: wrap;
+    }
+}
+
+/* SMALL MOBILE */
+@media (max-width: 420px) {
+    .reading-goal-section {
+        padding: 16px;
+    }
+
+    .goal-progress-info h3 {
+        font-size: 25px;
+    }
+
+    .goal-input-group {
+        flex-wrap: wrap;
+    }
+
+    .goal-input-group input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .goal-input-group button {
+        flex: 1;
+    }
+}
+
+
+
+/* MOBILE SIDEBAR */
+
+.menu-toggle {
+    display: none;
+    background: #75553F;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 13px;
+    font-size: 22px;
+    cursor: pointer;
+    margin-bottom: 20px;
+}
+
+.sidebar-overlay {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: -280px;
+        width: 260px;
+        height: 100vh;
+        z-index: 1100;
+        transition: left 0.3s ease;
+    }
+
+    .sidebar.active {
+        left: 0;
+    }
+
+    .menu-toggle {
+        display: inline-block;
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 1090;
+    }
+
+    .main-content {
+        width: 100%;
+        margin-left: 0;
+    }
+}
