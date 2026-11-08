@@ -182,6 +182,19 @@ const newCurrentPage = document.querySelector("#newCurrentPage");
 const closeProgressModalBtn = document.querySelector("#closeProgressModalBtn");
 const cancelProgressBtn = document.querySelector("#cancelProgressBtn");
 
+// Google Books Search elements
+const googleBookQuery = document.querySelector("#googleBookQuery");
+const searchGoogleBooksBtn = document.querySelector("#searchGoogleBooksBtn");
+const googleBooksMessage = document.querySelector("#googleBooksMessage");
+const googleBooksResults = document.querySelector("#googleBooksResults");
+
+
+console.log("Google Books elements:", {
+    googleBookQuery,
+    searchGoogleBooksBtn,
+    googleBooksMessage,
+    googleBooksResults
+});
 
 // Track the currently selected book
 let selectedBookId = null;
@@ -202,6 +215,140 @@ function getAuthHeaders() {
         "Authorization": `Bearer ${token}`
     };
 }
+
+
+
+ // ==================================
+ // GOOGLE BOOKS SEARCH
+ // ==================================
+
+async function searchGoogleBooks() {
+
+    const query = googleBookQuery.value.trim();
+
+    // Check if the search field is empty.
+    if (!query) {
+        googleBooksMessage.textContent = "Please enter a book title or author.";
+        return;
+    }
+
+    // Display loading message.
+    googleBooksMessage.textContent = "Searching for books...";
+    googleBooksResults.innerHTML = "";
+
+    try {
+
+        const response = await fetch(
+            `/api/google-books/search?q=${encodeURIComponent(query)}`
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "Failed to search Google Books.");
+        }
+
+        // Check if books were found.
+        if (result.data.length === 0) {
+            googleBooksMessage.textContent = "No books found. Try another search.";
+            return;
+        }
+
+        googleBooksMessage.textContent =
+            `Found ${result.totalItems} matching books.`;
+
+        displayGoogleBooksResults(result.data);
+
+    } catch (error) {
+
+        console.error("Google Books search error:", error);
+
+        googleBooksMessage.textContent = error.message;
+
+    }
+}
+
+
+
+function displayGoogleBooksResults(books) {
+
+    googleBooksResults.innerHTML = "";
+
+    books.forEach(book => {
+
+        const info = book.volumeInfo;
+
+        const title = info.title || "Unknown Title";
+
+        const authors = info.authors
+            ? info.authors.join(", ")
+            : "Unknown Author";
+
+        const cover = info.imageLinks?.thumbnail || "";
+
+        const resultCard = document.createElement("div");
+        resultCard.classList.add("google-book-result");
+
+        const coverContainer = document.createElement("div");
+        coverContainer.classList.add("google-book-cover");
+
+        if (cover) {
+            const image = document.createElement("img");
+            image.src = cover;
+            image.alt = `${title} cover`;
+            coverContainer.appendChild(image);
+        } else {
+            coverContainer.textContent = "📚";
+        }
+
+        const bookInfo = document.createElement("div");
+        bookInfo.classList.add("google-book-info");
+
+        const titleElement = document.createElement("h3");
+        titleElement.textContent = title;
+
+        const authorElement = document.createElement("p");
+        authorElement.textContent = authors;
+
+        const pagesElement = document.createElement("span");
+        pagesElement.textContent =
+            `${info.pageCount || "Unknown"} pages`;
+
+        bookInfo.append(
+            titleElement,
+            authorElement,
+            pagesElement
+        );
+
+        const selectButton = document.createElement("button");
+        selectButton.type = "button";
+        selectButton.classList.add("select-google-book");
+        selectButton.textContent = "Select";
+
+        selectButton.addEventListener("click", () => {
+
+            document.querySelector("#bookTitle").value = title;
+            document.querySelector("#bookAuthor").value = authors;
+
+            if (info.pageCount) {
+                document.querySelector("#totalPages").value =
+                    info.pageCount;
+            }
+
+            googleBooksMessage.textContent =
+                "Book details selected! Please review the information.";
+        });
+
+        resultCard.append(
+            coverContainer,
+            bookInfo,
+            selectButton
+        );
+
+        googleBooksResults.appendChild(resultCard);
+    });
+}
+
 
 // ==================================
 // 4. HELPER FUNCTIONS
@@ -575,6 +722,26 @@ navLinks.forEach((link) => {
 
 });
 
+
+// ==================================
+// GOOGLE BOOKS SEARCH EVENT
+// ==================================
+
+// searchGoogleBooksBtn.addEventListener("click", searchGoogleBooks);
+
+searchGoogleBooksBtn.addEventListener("click", () => {
+    console.log("Google Books Search button clicked!");
+
+    searchGoogleBooks();
+});
+
+// Allow pressing Enter to search.
+googleBookQuery.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+        event.preventDefault();
+        searchGoogleBooks();
+    }
+});
 
 // ==================================
 // 11. SEARCH EVENTS

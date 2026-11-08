@@ -1067,3 +1067,167 @@ body {
         font-size: 28px;
     }
 }
+
+
+/* ==================================
+   GOOGLE BOOKS SEARCH RESULTS
+================================== */
+
+.google-book-result {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px;
+    margin-top: 12px;
+    background: #F8F5EF;
+    border: 1px solid #E8DED2;
+    border-radius: 12px;
+}
+
+.google-book-cover {
+    width: 55px;
+    min-width: 55px;
+    height: 75px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: #E8DED2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.google-book-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.google-book-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.google-book-info h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    color: #44382F;
+    margin-bottom: 4px;
+}
+
+.google-book-info p {
+    font-size: 13px;
+    color: #8A7768;
+}
+
+.google-book-info span {
+    font-size: 12px;
+    color: #A18B79;
+}
+
+/* SELECT BUTTON */
+
+.select-google-book {
+    background: #A66A4C;
+    color: #FFFFFF;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.select-google-book:hover {
+    background: #89543B;
+}
+
+/* ==================================
+   LOGOUT BUTTON
+================================== */
+
+.logout-button {
+    width: calc(100% - 30px);
+    margin: 20px 15px;
+    padding: 11px 15px;
+    background: transparent;
+    color: #C18B70;
+    border: 1px solid #A66A4C;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.logout-button:hover {
+    background: #A66A4C;
+    color: #FFFFFF;
+}
+
+
+/* ==================================
+   GOOGLE BOOKS SEARCH BAR
+================================== */
+
+.google-books-search {
+    margin-bottom: 24px;
+}
+
+.google-books-search .section-label {
+    margin-bottom: 10px;
+}
+
+.search-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.search-input-group input {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 15px;
+    background: #F8F5EF;
+    border: 1px solid #E8DED2;
+    border-radius: 10px;
+    color: #44382F;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-input-group input:focus {
+    border-color: #A66A4C;
+    box-shadow: 0 0 0 3px rgba(166, 106, 76, 0.12);
+}
+
+.search-input-group input::placeholder {
+    color: #A18B79;
+}
+
+.search-input-group .primary-button {
+    padding: 12px 20px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+#googleBooksMessage {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #8A7768;
+}
+
+/* Mobile search layout */
+@media (max-width: 480px) {
+    .search-input-group {
+        gap: 8px;
+    }
+
+    .search-input-group .primary-button {
+        padding: 12px 14px;
+    }
+}
