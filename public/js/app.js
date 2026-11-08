@@ -18,6 +18,8 @@ function editBook(id) {
     bookStatus.value = book.status;
     totalPages.value = book.totalPages || "";
     currentPage.value = book.currentPage || "";
+    bookRating.value = book.rating || "";
+    personalNotes.value = book.personalNotes || "";
 
     // Preserve the existing book cover
     bookForm.dataset.coverUrl = book.coverUrl || "";
@@ -217,6 +219,9 @@ const bookStatus = document.querySelector("#bookStatus");
 const totalPages = document.querySelector("#totalPages");
 const currentPage = document.querySelector("#currentPage");
 
+const bookRating = document.querySelector("#bookRating");
+const personalNotes = document.querySelector("#personalNotes");
+
 const totalPagesRead = document.querySelector("#totalPagesRead");
 const averageCompletion = document.querySelector("#averageCompletion");
 
@@ -252,6 +257,11 @@ const googleBooksResults = document.querySelector("#googleBooksResults");
 const coverUpload = document.querySelector("#coverUpload");
 const coverPreview = document.querySelector("#coverPreview");
 const coverPreviewContainer = document.querySelector("#coverPreviewContainer");
+
+// const totalPages = document.querySelector("#totalPages");
+// const currentPage = document.querySelector("#currentPage");
+
+
 
 // ==================================
 // BOOK COVER IMAGE PREVIEW
@@ -460,6 +470,14 @@ function displayGoogleBooksResults(books) {
             
             document.querySelector("#bookForm").dataset.coverUrl = coverUrl;
 
+            if (coverUrl) {
+                coverPreview.src = coverUrl;
+                coverPreviewContainer.classList.remove("hidden");
+            } else {
+                coverPreview.src = "";
+                coverPreviewContainer.classList.add("hidden");
+            }
+
             googleBooksMessage.textContent =
                 "Book details selected! Please review the information.";
         });
@@ -540,6 +558,7 @@ function displayBooks(bookList) {
         const bookCard = document.createElement("article");
         bookCard.classList.add("book-card");
 
+        console.log("Book rating:", book.title, book.rating);
         
         const cover = document.createElement("div");
         cover.classList.add("book-cover");
@@ -569,6 +588,19 @@ function displayBooks(bookList) {
 
         const author = document.createElement("p");
         author.textContent = book.author;
+
+        // Book rating
+        const rating = document.createElement("p");
+        rating.classList.add("book-rating");
+
+        if (book.rating) {
+            rating.textContent =
+                "★".repeat(book.rating) +
+                "☆".repeat(5 - book.rating);
+        } else {
+            rating.textContent = "Not rated yet";
+            rating.classList.add("no-rating");
+        }
 
         const status = document.createElement("span");
         status.classList.add("book-status");
@@ -648,15 +680,16 @@ function displayBooks(bookList) {
             progressBar.appendChild(progressFill);
             progressContainer.append(progressText, progressBar);
 
-            info.append(title, author, status, progressContainer, actions);
+            info.append(title, author, rating, status, progressContainer, actions);
         } else {
-            info.append(title, author, status, actions);
+            info.append(title, author, rating, status, actions);
         }
 
         bookCard.append(cover, info);
         bookContainer.appendChild(bookCard);
     });
 }
+
 
 // ==================================
 // 6. PROGRESS MODAL
@@ -994,7 +1027,9 @@ bookForm.addEventListener("submit", async (event) => {
             status: bookStatus.value,
             totalPages: Number(totalPages.value) || 0,
             currentPage: Number(currentPage.value) || 0,
-            coverUrl: coverUrl
+            coverUrl: bookForm.dataset.coverUrl || null,
+            rating: bookRating.value ? Number(bookRating.value) : null,
+            personalNotes: personalNotes.value.trim() || null
         };
 
         // Automatically update reading status
@@ -1043,6 +1078,8 @@ bookForm.addEventListener("submit", async (event) => {
                 completedAt: result.data.completed_at,
                 coverUrl: result.data.cover_url,
                 isFavorite: result.data.is_favorite,
+                rating: result.data.rating,
+                personalNotes: result.data.personal_notes,
                 cover: book.cover || "cover-brown"
             });
 
@@ -1077,8 +1114,11 @@ try {
         status: bookStatus.value,
         totalPages: Number(totalPages.value) || 0,
         currentPage: Number(currentPage.value) || 0,
-        coverUrl: coverUrl
+        coverUrl: coverUrl,
+        rating: bookRating.value ? Number(bookRating.value) : null,
+        personalNotes: personalNotes.value.trim() || null
     };
+    console.log("New book data:", newBook);
 
     const response = await fetch("/api/books", {
         method: "POST",
@@ -1104,6 +1144,8 @@ try {
         completedAt: result.data.completed_at,
         coverUrl: result.data.cover_url,
         isFavorite: result.data.is_favorite,
+        rating: result.data.rating,
+        personalNotes: result.data.personal_notes,
         cover: "cover-brown"
     });
 
@@ -1156,6 +1198,8 @@ async function loadBooksFromAPI() {
                 completedAt: book.completed_at,
                 coverUrl: book.cover_url,
                 isFavorite: book.is_favorite,
+                rating: book.rating,
+                personalNotes: book.personal_notes,
                 cover: book.cover || "cover-brown"
             }))
         );

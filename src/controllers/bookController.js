@@ -57,7 +57,9 @@ export async function addBook(req, res) {
             currentPage,
             completedAt,
             coverUrl,
-            isFavorite
+            isFavorite,
+            rating,
+            personalNotes
         } = req.body;
 
         if (!title || !author || !genre || !status) {
@@ -79,9 +81,9 @@ export async function addBook(req, res) {
         const result = await pool.query(
             `INSERT INTO books (
                 id, title, author, genre, status,
-                total_pages, current_page, completed_at, user_id, cover_url
+                total_pages, current_page, completed_at, user_id, cover_url, is_favorite, rating, personal_notes
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *`,
             [
                 Date.now(),
@@ -94,7 +96,9 @@ export async function addBook(req, res) {
                 completedAt || null,
                 req.user.id,
                 coverUrl || null,
-                isFavorite || false
+                isFavorite || false,
+                rating || null,
+                personalNotes || null
             ]
         );
 
@@ -128,7 +132,9 @@ export async function updateBook(req, res) {
             currentPage,
             completedAt,
             coverUrl,
-            isFavorite
+            isFavorite,
+            rating,
+            personalNotes
         } = req.body;
 
         if (!title || !author || !genre || !status) {
@@ -158,8 +164,10 @@ export async function updateBook(req, res) {
                 current_page = $6,
                 completed_at = $7,
                 cover_url = COALESCE($8, cover_url),
-                is_favorite = COALESCE($9, is_favorite)
-             WHERE id = $10 AND user_id = $11
+                is_favorite = COALESCE($9, is_favorite),
+                rating = COALESCE($10, rating),
+                personal_notes = COALESCE($11, personal_notes)
+                WHERE id = $12 AND user_id = $13
              RETURNING *`,
             [
                 title,
@@ -171,6 +179,8 @@ export async function updateBook(req, res) {
                 completedAt || null,
                 coverUrl || null,
                 isFavorite ?? null,
+                rating ?? null,
+                personalNotes ?? null,
                 bookId,
                 req.user.id
             ]
