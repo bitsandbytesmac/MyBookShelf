@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import bookRoutes from "./src/routes/bookRoutes.js";
 
 dotenv.config();
 
@@ -19,6 +20,8 @@ app.get('/api/health', (req, res) => {
         status: 'success'
     });
 });
+
+app.use("/api/books", bookRoutes);
 
 // Start server
 app.listen(PORT, () => {

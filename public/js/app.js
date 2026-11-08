@@ -1,4 +1,3 @@
-
 function editBook(id) {
     const book = books.find(book => book.id === id);
 
@@ -19,70 +18,87 @@ function editBook(id) {
 
 
 
-function deleteBook(id) {
+// DELETE - Remove a book through Backend API
+async function deleteBook(id) {
     const confirmDelete = confirm(
         "Are you sure you want to delete this book?"
     );
 
     if (!confirmDelete) return;
 
-    const bookIndex = books.findIndex(book => book.id === id);
+    try {
+        const response = await fetch(`/api/books/${id}`, {
+            method: "DELETE"
+        });
 
-    if (bookIndex === -1) return;
+        const result = await response.json();
 
-    books.splice(bookIndex, 1);
+        if (!response.ok) {
+            throw new Error(result.message || "Failed to delete book.");
+        }
 
-    saveBooks();
-    updateStatistics();
-    filterBooks();
+        // Remove the deleted book from the frontend array.
+        const bookIndex = books.findIndex(book => book.id === id);
+
+        if (bookIndex !== -1) {
+            books.splice(bookIndex, 1);
+        }
+
+        // Refresh dashboard and bookshelf.
+        updateStatistics();
+        filterBooks();
+
+        console.log("Book deleted successfully through API.");
+
+    } catch (error) {
+        console.error("Error deleting book:", error);
+        alert(error.message);
+    }
 }
 
 
+
 // ==================================
-// 1. SAMPLE BOOK DATA
+// 1. BOOK DATA
+// ==================================
+const books = [];
+
+// ==================================
+// LOAD BOOKS FROM BACKEND API
 // ==================================
 
-const savedBooks = localStorage.getItem("myBooks");
+async function loadBooksFromAPI() {
+    try {
+        const response = await fetch("/api/books");
 
-const books = savedBooks
-    ? JSON.parse(savedBooks)
-    : [
-        {
-            id: 1,
-            title: "The Silent Patient",
-            author: "Alex Michaelides",
-            genre: "Fiction",
-            status: "Completed",
-            cover: "cover-brown"
-        },
-        {
-            id: 2,
-            title: "Atomic Habits",
-            author: "James Clear",
-            genre: "Self-help",
-            status: "Reading",
-            cover: "cover-green"
-        },
-        {
-            id: 3,
-            title: "It Ends With Us",
-            author: "Colleen Hoover",
-            genre: "Romance",
-            status: "Want to Read",
-            cover: "cover-pink"
-        },
-        {
-            id: 4,
-            title: "The Hobbit",
-            author: "J.R.R. Tolkien",
-            genre: "Fantasy",
-            status: "Completed",
-            cover: "cover-blue"
+        if (!response.ok) {
+            throw new Error("Failed to retrieve books.");
         }
-    ];
 
-function saveBooks() {
-    localStorage.setItem("myBooks", JSON.stringify(books));
+        const result = await response.json();
+
+        // Replace sample/local books with backend books.
+        books.splice(
+            0,
+            books.length,
+            ...result.data.map(book => ({
+                ...book,
+                totalPages: book.totalPages || 0,
+                currentPage: book.currentPage || 0,
+                cover: book.cover || "cover-brown"
+            }))
+        );
+
+        // Refresh the dashboard and book list.
+        updateStatistics();
+        filterBooks();
+
+        console.log("Books loaded successfully from API.");
+
+    } catch (error) {
+        console.error("Error loading books:", error);
+        alert("Unable to load books from the server.");
+    }
 }
 
 
@@ -336,20 +352,21 @@ closeProgressModalBtn.addEventListener("click", closeProgressModal);
 cancelProgressBtn.addEventListener("click", closeProgressModal);
 
 
-// ==================================
-// 7. SAVE READING PROGRESS
-// ==================================
 
-progressForm.addEventListener("submit", (event) => {
+ // ==================================
+ // 7. SAVE READING PROGRESS THROUGH API
+ // ==================================
+
+progressForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const book = books.find(book => book.id === selectedBookId);
 
     if (!book) return;
 
-    const previousStatus = book.status;
     const updatedPage = Number(newCurrentPage.value);
 
+    // Validate page number.
     if (
         updatedPage < 0 ||
         updatedPage > book.totalPages ||
@@ -359,28 +376,61 @@ progressForm.addEventListener("submit", (event) => {
         return;
     }
 
-    book.currentPage = updatedPage;
+    // Prepare updated book information.
+    const updatedBook = {
+        ...book,
+        currentPage: updatedPage
+    };
 
-    // Automatically update the book status.
-    if (book.currentPage >= book.totalPages && book.totalPages > 0) {
-        book.status = "Completed";
-    } else if (book.currentPage > 0) {
-        book.status = "Reading";
+    // Automatically update reading status.
+    if (
+        updatedBook.currentPage >= updatedBook.totalPages &&
+        updatedBook.totalPages > 0
+    ) {
+        updatedBook.status = "Completed";
+    } else if (updatedBook.currentPage > 0) {
+        updatedBook.status = "Reading";
     } else {
-        book.status = "Want to Read";
+        updatedBook.status = "Want to Read";
     }
 
-    // Record the completion date before saving.
-    updateCompletionDate(book, previousStatus);
+    // Record or clear completion date.
+    updateCompletionDate(updatedBook, book.status);
 
-    // Save changes and refresh dashboard.
-    saveBooks();
-    updateStatistics();
-    filterBooks();
+    // Send updated progress to backend.
+    try {
+        const response = await fetch(`/api/books/${book.id}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(updatedBook)
+        });
 
-    closeProgressModal();
-    progressForm.reset();
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "Failed to update reading progress.");
+        }
+
+        // Update frontend using backend response.
+        Object.assign(book, result.data);
+
+        // Refresh dashboard and bookshelf.
+        updateStatistics();
+        filterBooks();
+
+        console.log("Reading progress updated successfully through API.");
+
+        closeProgressModal();
+        progressForm.reset();
+
+    } catch (error) {
+        console.error("Error updating reading progress:", error);
+        alert(error.message);
+    }
 });
+
 
 
 // ==================================
@@ -463,7 +513,6 @@ function filterBooks() {
 // ==================================
 // 10. NAVIGATION EVENTS
 // ==================================
-
 
 navLinks.forEach((link) => {
 
@@ -537,12 +586,11 @@ closeModalBtn.addEventListener("click", closeModal);
 
 cancelBtn.addEventListener("click", closeModal);
 
-
 // ==================================
 // 14. SAVE BOOK (ADD / EDIT)
 // ==================================
 
-bookForm.addEventListener("submit", (event) => {
+bookForm.addEventListener("submit", async (event) => {
 
     event.preventDefault();
 
@@ -550,371 +598,142 @@ bookForm.addEventListener("submit", (event) => {
 
     if (id) {
 
-        // UPDATE EXISTING BOOK
+        // UPDATE EXISTING BOOK THROUGH BACKEND API
+
         const book = books.find(book => book.id === id);
 
         if (!book) return;
 
         const previousStatus = book.status;
 
-        book.title = bookTitle.value.trim();
-        book.author = bookAuthor.value.trim();
-        book.genre = bookGenre.value;
-        book.status = bookStatus.value;
-        book.totalPages = Number(totalPages.value) || 0;
-        book.currentPage = Number(currentPage.value) || 0;
-
-        if (book.currentPage >= book.totalPages && book.totalPages > 0) {
-            book.status = "Completed";
-        } else if (book.currentPage > 0) {
-            book.status = "Reading";
-        }
-
-        // Record or clear completion date.
-        updateCompletionDate(book, previousStatus);
-
-    } else {
-
-        // CREATE NEW BOOK
-        const newBook = {
-            id: Date.now(),
+        // Prepare updated book details
+        const updatedBook = {
             title: bookTitle.value.trim(),
             author: bookAuthor.value.trim(),
             genre: bookGenre.value,
             status: bookStatus.value,
             totalPages: Number(totalPages.value) || 0,
-            currentPage: Number(currentPage.value) || 0,
-            cover: "cover-brown"
+            currentPage: Number(currentPage.value) || 0
         };
 
-        if (newBook.currentPage >= newBook.totalPages && newBook.totalPages > 0) {
-            newBook.status = "Completed";
-        } else if (newBook.currentPage > 0) {
-            newBook.status = "Reading";
+        // Automatically update reading status
+        if (
+            updatedBook.currentPage >= updatedBook.totalPages &&
+            updatedBook.totalPages > 0
+        ) {
+            updatedBook.status = "Completed";
+        } else if (updatedBook.currentPage > 0) {
+            updatedBook.status = "Reading";
         }
 
-        // Record completion date for a newly completed book.
-        updateCompletionDate(newBook, null);
+        // Apply updated values temporarily
+        Object.assign(book, updatedBook);
 
-        books.push(newBook);
+        // Record or clear completion date
+        updateCompletionDate(book, previousStatus);
+
+        // Send updated details to backend
+        try {
+            const response = await fetch(`/api/books/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    ...updatedBook,
+                    completedAt: book.completedAt || null
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || "Failed to update book.");
+            }
+
+            // Update local book using backend response
+            Object.assign(book, result.data);
+
+            console.log("Book updated successfully through API.");
+
+        } catch (error) {
+            console.error("Error updating book:", error);
+            alert(error.message);
+            return;
+        }
     }
 
-    // Save changes to localStorage.
-    saveBooks();
+    else {
 
-    // Refresh dashboard.
-    updateStatistics();
-    filterBooks();
+    // CREATE NEW BOOK THROUGH BACKEND API
 
-    closeModal();
-    bookForm.reset();
+    const newBook = {
+        title: bookTitle.value.trim(),
+        author: bookAuthor.value.trim(),
+        genre: bookGenre.value,
+        status: bookStatus.value,
+        totalPages: Number(totalPages.value) || 0,
+        currentPage: Number(currentPage.value) || 0
+    };
 
-});
-
-// ==================================
-// 6. PROGRESS MODAL
-// ==================================
-
-function updateProgress(id) {
-    const book = books.find(book => book.id === id);
-
-    if (!book) return;
-
-    selectedBookId = book.id;
-
-    progressBookTitle.textContent = book.title;
-    newCurrentPage.value = book.currentPage || 0;
-    newCurrentPage.max = book.totalPages;
-
-    progressModal.classList.remove("hidden");
-}
-
-function closeProgressModal() {
-    progressModal.classList.add("hidden");
-    selectedBookId = null;
-}
-
-closeProgressModalBtn.addEventListener("click", closeProgressModal);
-
-cancelProgressBtn.addEventListener("click", closeProgressModal);
-
-
-// ==================================
-// 7. SAVE READING PROGRESS
-// ==================================
-
-progressForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-
-    const book = books.find(book => book.id === selectedBookId);
-
-    if (!book) return;
-
-    const previousStatus = book.status;
-    const updatedPage = Number(newCurrentPage.value);
-
-    if (
-        updatedPage < 0 ||
-        updatedPage > book.totalPages ||
-        !Number.isInteger(updatedPage)
-    ) {
-        alert("Please enter a valid page number.");
-        return;
-    }
-
-    book.currentPage = updatedPage;
-
-    // Automatically update the book status.
-    if (book.currentPage >= book.totalPages && book.totalPages > 0) {
-        book.status = "Completed";
-    } else if (book.currentPage > 0) {
-        book.status = "Reading";
-    } else {
-        book.status = "Want to Read";
-    }
-
-    // Record the completion date before saving.
-    updateCompletionDate(book, previousStatus);
-
-    // Save changes and refresh dashboard.
-    saveBooks();
-    updateStatistics();
-    filterBooks();
-
-    closeProgressModal();
-    progressForm.reset();
-});
-
-
-// ==================================
-// 8. UPDATE DASHBOARD STATISTICS
-// ==================================
-
-function updateStatistics() {
-
-    // Count books by status.
-    totalBooks.textContent = books.length;
-
-    readingBooks.textContent =
-        books.filter(book => book.status === "Reading").length;
-
-    completedBooks.textContent =
-        books.filter(book => book.status === "Completed").length;
-
-    wishlistBooks.textContent =
-        books.filter(book => book.status === "Want to Read").length;
-
-
-    // Calculate total pages read.
-    const pagesRead = books.reduce((total, book) => {
-        return total + (Number(book.currentPage) || 0);
-    }, 0);
-
-    totalPagesRead.textContent = pagesRead.toLocaleString();
-
-
-    // Calculate average completion.
-    const booksWithPages = books.filter(book => book.totalPages > 0);
-
-    const average = booksWithPages.length > 0
-        ? booksWithPages.reduce((total, book) => {
-            const percentage =
-                (book.currentPage / book.totalPages) * 100;
-
-            return total + Math.min(percentage, 100);
-        }, 0) / booksWithPages.length
-        : 0;
-
-    averageCompletion.textContent = `${Math.round(average)}%`;
-
-    // Refresh yearly reading goal.
-    updateReadingGoal();
-}
-
-
-// ==================================
-// 9. SEARCH AND FILTER
-// ==================================
-
-function filterBooks() {
-
-    const searchTerm = searchInput.value.toLowerCase();
-
-    const selectedGenre = genreFilter.value;
-
-    const filteredBooks = books.filter((book) => {
-
-        const matchesSearch =
-            book.title.toLowerCase().includes(searchTerm) ||
-            book.author.toLowerCase().includes(searchTerm);
-
-        const matchesGenre =
-            selectedGenre === "All" ||
-            book.genre === selectedGenre;
-
-        const matchesStatus =
-            currentStatus === "All" ||
-            book.status === currentStatus;
-
-        return matchesSearch && matchesGenre && matchesStatus;
-    });
-
-    displayBooks(filteredBooks);
-}
-
-
-// ==================================
-// 10. NAVIGATION EVENTS
-// ==================================
-
-navLinks.forEach((link) => {
-
-    link.addEventListener("click", (event) => {
-
-        event.preventDefault();
-
-        navLinks.forEach((nav) => {
-            nav.classList.remove("active");
+    try {
+        const response = await fetch("/api/books", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(newBook)
         });
 
-        link.classList.add("active");
+        const result = await response.json();
 
-        currentStatus = link.dataset.filter;
+        if (!response.ok) {
+            throw new Error(result.message || "Failed to add book.");
+        }
 
-        sectionTitle.textContent =
-            currentStatus === "All"
-                ? "My Bookshelf"
-                : currentStatus;
+        // Add the book returned by the backend.
+        books.push({
+            ...result.data,
+            cover: "cover-brown"
+        });
 
-        filterBooks();
-    });
-});
+        console.log("Book added successfully through API.");
 
-
-// ==================================
-// 11. SEARCH EVENTS
-// ==================================
-
-searchInput.addEventListener("input", () => {
-    filterBooks();
-});
-
-genreFilter.addEventListener("change", () => {
-    filterBooks();
-});
-
-
-// ==================================
-// 12. OPEN ADD BOOK MODAL
-// ==================================
-
-addBookBtn.addEventListener("click", () => {
-
-    bookForm.reset();
-
-    bookId.value = "";
-
-    modalTitle.textContent = "Add a Book";
-
-    bookModal.classList.remove("hidden");
-
-});
-
-
-// ==================================
-// 13. CLOSE BOOK MODAL
-// ==================================
-
-function closeModal() {
-    bookModal.classList.add("hidden");
+    } catch (error) {
+        console.error("Error adding book:", error);
+        alert(error.message);
+        return;
+    }
 }
 
-closeModalBtn.addEventListener("click", closeModal);
-
-cancelBtn.addEventListener("click", closeModal);
-
-
-// ==================================
-// 14. SAVE BOOK (ADD / EDIT)
-// ==================================
-
-bookForm.addEventListener("submit", (event) => {
-
-    event.preventDefault();
-
-    const id = Number(bookId.value);
-
-    if (id) {
-
-        // UPDATE EXISTING BOOK
-        const book = books.find(book => book.id === id);
-
-        if (!book) return;
-
-        const previousStatus = book.status;
-
-        book.title = bookTitle.value.trim();
-        book.author = bookAuthor.value.trim();
-        book.genre = bookGenre.value;
-        book.status = bookStatus.value;
-        book.totalPages = Number(totalPages.value) || 0;
-        book.currentPage = Number(currentPage.value) || 0;
-
-        if (book.currentPage >= book.totalPages && book.totalPages > 0) {
-            book.status = "Completed";
-        } else if (book.currentPage > 0) {
-            book.status = "Reading";
-        }
-
-        // Record or clear completion date.
-        updateCompletionDate(book, previousStatus);
-
-    } else {
-
-        // CREATE NEW BOOK
-        const newBook = {
-            id: Date.now(),
-            title: bookTitle.value.trim(),
-            author: bookAuthor.value.trim(),
-            genre: bookGenre.value,
-            status: bookStatus.value,
-            totalPages: Number(totalPages.value) || 0,
-            currentPage: Number(currentPage.value) || 0,
-            cover: "cover-brown"
-        };
-
-        if (newBook.currentPage >= newBook.totalPages && newBook.totalPages > 0) {
-            newBook.status = "Completed";
-        } else if (newBook.currentPage > 0) {
-            newBook.status = "Reading";
-        }
-
-        // Record completion date for a newly completed book.
-        updateCompletionDate(newBook, null);
-
-        books.push(newBook);
-    }
-
     // Save changes to localStorage.
-    saveBooks();
+    // saveBooks();
+
+    // Refresh dashboard.
+    updateStatistics();
+    filterBooks();
 
     closeModal();
     bookForm.reset();
 
 });
 
-    // Refresh dashboard.
-    updateStatistics();
-    filterBooks();
 
+// Initial dashboard render.
+// IMPORTANT: Keep these two calls.
+// updateStatistics();
+// filterBooks();
 
+// Load books from backend when the page opens.
+loadBooksFromAPI();
+
+// ==================================
 // MOBILE SIDEBAR
-
+// ==================================
 
 console.log("Menu toggle:", menuToggle);
 console.log("Sidebar overlay:", sidebarOverlay);
 console.log("Sidebar:", sidebar);
-
 
 menuToggle.addEventListener("click", () => {
     sidebar.classList.toggle("active");
