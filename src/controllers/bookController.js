@@ -55,7 +55,9 @@ export async function addBook(req, res) {
             status,
             totalPages,
             currentPage,
-            completedAt
+            completedAt,
+            coverUrl,
+            isFavorite
         } = req.body;
 
         if (!title || !author || !genre || !status) {
@@ -77,9 +79,9 @@ export async function addBook(req, res) {
         const result = await pool.query(
             `INSERT INTO books (
                 id, title, author, genre, status,
-                total_pages, current_page, completed_at, user_id
+                total_pages, current_page, completed_at, user_id, cover_url
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *`,
             [
                 Date.now(),
@@ -90,7 +92,9 @@ export async function addBook(req, res) {
                 Number(totalPages),
                 Number(currentPage),
                 completedAt || null,
-                req.user.id
+                req.user.id,
+                coverUrl || null,
+                isFavorite || false
             ]
         );
 
@@ -122,7 +126,9 @@ export async function updateBook(req, res) {
             status,
             totalPages,
             currentPage,
-            completedAt
+            completedAt,
+            coverUrl,
+            isFavorite
         } = req.body;
 
         if (!title || !author || !genre || !status) {
@@ -150,8 +156,10 @@ export async function updateBook(req, res) {
                 status = $4,
                 total_pages = $5,
                 current_page = $6,
-                completed_at = $7
-             WHERE id = $8 AND user_id = $9
+                completed_at = $7,
+                cover_url = COALESCE($8, cover_url),
+                is_favorite = COALESCE($9, is_favorite)
+             WHERE id = $10 AND user_id = $11
              RETURNING *`,
             [
                 title,
@@ -161,6 +169,8 @@ export async function updateBook(req, res) {
                 Number(totalPages),
                 Number(currentPage),
                 completedAt || null,
+                coverUrl || null,
+                isFavorite ?? null,
                 bookId,
                 req.user.id
             ]

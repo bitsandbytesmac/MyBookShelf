@@ -19,6 +19,21 @@ function editBook(id) {
     totalPages.value = book.totalPages || "";
     currentPage.value = book.currentPage || "";
 
+    // Preserve the existing book cover
+    bookForm.dataset.coverUrl = book.coverUrl || "";
+
+    // Reset the manual upload input
+    coverUpload.value = "";
+
+    // Display the existing cover preview
+    if (book.coverUrl) {
+        coverPreview.src = book.coverUrl;
+        coverPreviewContainer.classList.remove("hidden");
+    } else {
+        coverPreview.src = "";
+        coverPreviewContainer.classList.add("hidden");
+    }
+
     modalTitle.textContent = "Edit Book";
 
     bookModal.classList.remove("hidden");
@@ -62,6 +77,52 @@ async function deleteBook(id) {
 
     } catch (error) {
         console.error("Error deleting book:", error);
+        alert(error.message);
+    }
+}
+
+// ==================================
+// TOGGLE BOOK FAVORITE STATUS
+// ==================================
+
+async function toggleFavorite(id) {
+    const book = books.find(book => book.id === id);
+
+    if (!book) return;
+
+    const newFavoriteStatus = !book.isFavorite;
+
+    const updatedBook = {
+        title: book.title,
+        author: book.author,
+        genre: book.genre,
+        status: book.status,
+        totalPages: book.totalPages,
+        currentPage: book.currentPage,
+        completedAt: book.completedAt || null,
+        coverUrl: book.coverUrl || null,
+        isFavorite: newFavoriteStatus
+    };
+
+    try {
+        const response = await fetch(`/api/books/${id}`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify(updatedBook)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "Failed to update favorite.");
+        }
+
+        book.isFavorite = result.data.is_favorite;
+
+        filterBooks();
+
+    } catch (error) {
+        console.error("Error updating favorite:", error);
         alert(error.message);
     }
 }
@@ -188,6 +249,40 @@ const searchGoogleBooksBtn = document.querySelector("#searchGoogleBooksBtn");
 const googleBooksMessage = document.querySelector("#googleBooksMessage");
 const googleBooksResults = document.querySelector("#googleBooksResults");
 
+const coverUpload = document.querySelector("#coverUpload");
+const coverPreview = document.querySelector("#coverPreview");
+const coverPreviewContainer = document.querySelector("#coverPreviewContainer");
+
+// ==================================
+// BOOK COVER IMAGE PREVIEW
+// ==================================
+
+coverUpload.addEventListener("change", function () {
+
+    const file = coverUpload.files[0];
+
+    if (!file) {
+        coverPreviewContainer.classList.add("hidden");
+        coverPreview.src = "";
+        return;
+    }
+
+    // Check file size (5 MB maximum)
+    if (file.size > 5 * 1024 * 1024) {
+        alert("Image size must not exceed 5 MB.");
+        coverUpload.value = "";
+        coverPreviewContainer.classList.add("hidden");
+        coverPreview.src = "";
+        return;
+    }
+
+    // Preview selected image
+    const imageUrl = URL.createObjectURL(file);
+
+    coverPreview.src = imageUrl;
+    coverPreviewContainer.classList.remove("hidden");
+});
+
 
 console.log("Google Books elements:", {
     googleBookQuery,
@@ -214,6 +309,33 @@ function getAuthHeaders() {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
     };
+}
+
+// ==================================
+// UPLOAD BOOK COVER TO CLOUDINARY
+// ==================================
+
+async function uploadBookCover(file) {
+
+    const formData = new FormData();
+
+    formData.append("cover", file);
+
+    const response = await fetch("/api/uploads/cover", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: formData
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+        throw new Error(result.message || "Failed to upload book cover.");
+    }
+
+    return result.data.coverUrl;
 }
 
 
@@ -285,6 +407,7 @@ function displayGoogleBooksResults(books) {
             : "Unknown Author";
 
         const cover = info.imageLinks?.thumbnail || "";
+        const coverUrl = cover.replace("http://", "https://");
 
         const resultCard = document.createElement("div");
         resultCard.classList.add("google-book-result");
@@ -334,6 +457,8 @@ function displayGoogleBooksResults(books) {
                 document.querySelector("#totalPages").value =
                     info.pageCount;
             }
+            
+            document.querySelector("#bookForm").dataset.coverUrl = coverUrl;
 
             googleBooksMessage.textContent =
                 "Book details selected! Please review the information.";
@@ -415,9 +540,26 @@ function displayBooks(bookList) {
         const bookCard = document.createElement("article");
         bookCard.classList.add("book-card");
 
+        
         const cover = document.createElement("div");
-        cover.classList.add("book-cover", book.cover);
-        cover.textContent = book.title;
+        cover.classList.add("book-cover");
+
+        if (book.coverUrl) {
+
+            const coverImage = document.createElement("img");
+
+            coverImage.src = book.coverUrl;
+            coverImage.alt = `${book.title} cover`;
+
+            cover.appendChild(coverImage);
+
+        } else {
+
+            cover.classList.add(book.cover || "cover-brown");
+            cover.textContent = book.title;
+
+        }
+
 
         const info = document.createElement("div");
         info.classList.add("book-info");
@@ -443,6 +585,23 @@ function displayBooks(bookList) {
             editBook(book.id);
         });
 
+        // Favorite button
+        const favoriteButton = document.createElement("button");
+
+        favoriteButton.textContent = book.isFavorite
+            ? "♥ Favorited"
+            : "♡ Favorite";
+
+        favoriteButton.classList.add("favorite-button");
+
+        if (book.isFavorite) {
+            favoriteButton.classList.add("active");
+        }
+
+        favoriteButton.addEventListener("click", () => {
+            toggleFavorite(book.id);
+        });
+
         const deleteButton = document.createElement("button");
         deleteButton.textContent = "Delete";
         deleteButton.classList.add("delete-button");
@@ -459,7 +618,12 @@ function displayBooks(bookList) {
             updateProgress(book.id);
         });
 
-        actions.append(editButton, progressButton, deleteButton);
+        actions.append(
+            editButton,
+            favoriteButton,
+            progressButton,
+            deleteButton
+        );
 
         if (book.totalPages > 0) {
             const percentage = Math.min(
@@ -679,8 +843,10 @@ function filterBooks() {
             book.genre === selectedGenre;
 
         const matchesStatus =
-            currentStatus === "All" ||
-            book.status === currentStatus;
+        currentStatus === "All" ||
+        (currentStatus === "Favorites"
+            ? book.isFavorite
+            : book.status === currentStatus);
 
         return matchesSearch && matchesGenre && matchesStatus;
     });
@@ -764,6 +930,14 @@ addBookBtn.addEventListener("click", () => {
 
     bookForm.reset();
 
+    // Clear previously selected Google Books cover
+    bookForm.dataset.coverUrl = "";
+
+    // Clear previous Google Books search
+    googleBookQuery.value = "";
+    googleBooksMessage.textContent = "";
+    googleBooksResults.innerHTML = "";
+
     bookId.value = "";
 
     modalTitle.textContent = "Add a Book";
@@ -806,13 +980,21 @@ bookForm.addEventListener("submit", async (event) => {
         const previousStatus = book.status;
 
         // Prepare updated book details
+        let coverUrl = bookForm.dataset.coverUrl || null;
+
+        // Upload replacement cover if a new image was selected
+        if (coverUpload.files.length > 0) {
+            coverUrl = await uploadBookCover(coverUpload.files[0]);
+        }
+
         const updatedBook = {
             title: bookTitle.value.trim(),
             author: bookAuthor.value.trim(),
             genre: bookGenre.value,
             status: bookStatus.value,
             totalPages: Number(totalPages.value) || 0,
-            currentPage: Number(currentPage.value) || 0
+            currentPage: Number(currentPage.value) || 0,
+            coverUrl: coverUrl
         };
 
         // Automatically update reading status
@@ -838,7 +1020,8 @@ bookForm.addEventListener("submit", async (event) => {
                 headers: getAuthHeaders(),
                 body: JSON.stringify({
                     ...updatedBook,
-                    completedAt: book.completedAt || null
+                    completedAt: book.completedAt || null,
+                    coverUrl: updatedBook.coverUrl
                 })
             });
 
@@ -858,6 +1041,8 @@ bookForm.addEventListener("submit", async (event) => {
                 totalPages: result.data.total_pages,
                 currentPage: result.data.current_page,
                 completedAt: result.data.completed_at,
+                coverUrl: result.data.cover_url,
+                isFavorite: result.data.is_favorite,
                 cover: book.cover || "cover-brown"
             });
 
@@ -874,50 +1059,63 @@ bookForm.addEventListener("submit", async (event) => {
 
     // CREATE NEW BOOK THROUGH BACKEND API
 
+try {
+
+    let coverUrl = bookForm.dataset.coverUrl || null;
+
+    // Upload manually selected cover to Cloudinary
+    if (coverUpload.files.length > 0) {
+
+        coverUrl = await uploadBookCover(coverUpload.files[0]);
+
+    }
+
     const newBook = {
         title: bookTitle.value.trim(),
         author: bookAuthor.value.trim(),
         genre: bookGenre.value,
         status: bookStatus.value,
         totalPages: Number(totalPages.value) || 0,
-        currentPage: Number(currentPage.value) || 0
+        currentPage: Number(currentPage.value) || 0,
+        coverUrl: coverUrl
     };
 
-    try {
-        const response = await fetch("/api/books", {
-            method: "POST",
-            headers: getAuthHeaders(),
-            body: JSON.stringify(newBook)
-        });
+    const response = await fetch("/api/books", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(newBook)
+    });
 
-        const result = await response.json();
+    const result = await response.json();
 
-        if (!response.ok) {
-            throw new Error(result.message || "Failed to add book.");
-        }
+    if (!response.ok) {
+        throw new Error(result.message || "Failed to add book.");
+    }
 
-        // Add the book returned by the backend.
-        books.push({
-            id: Number(result.data.id),
-            title: result.data.title,
-            author: result.data.author,
-            genre: result.data.genre,
-            status: result.data.status,
-            totalPages: result.data.total_pages,
-            currentPage: result.data.current_page,
-            completedAt: result.data.completed_at,
-            cover: "cover-brown"
-        });
+    // Add the book returned by the backend
+    books.push({
+        id: Number(result.data.id),
+        title: result.data.title,
+        author: result.data.author,
+        genre: result.data.genre,
+        status: result.data.status,
+        totalPages: result.data.total_pages,
+        currentPage: result.data.current_page,
+        completedAt: result.data.completed_at,
+        coverUrl: result.data.cover_url,
+        isFavorite: result.data.is_favorite,
+        cover: "cover-brown"
+    });
 
-        console.log("Book added successfully through API.");
+    console.log("Book added successfully through API.");
 
     } catch (error) {
         console.error("Error adding book:", error);
         alert(error.message);
         return;
     }
-}
 
+    }
     // Refresh dashboard.
     updateStatistics();
     filterBooks();
@@ -956,6 +1154,8 @@ async function loadBooksFromAPI() {
                 totalPages: book.total_pages || 0,
                 currentPage: book.current_page || 0,
                 completedAt: book.completed_at,
+                coverUrl: book.cover_url,
+                isFavorite: book.is_favorite,
                 cover: book.cover || "cover-brown"
             }))
         );
