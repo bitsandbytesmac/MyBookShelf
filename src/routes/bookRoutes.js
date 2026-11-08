@@ -1,5 +1,6 @@
 
 import express from "express";
+import { authenticateToken } from "../middleware/authMiddleware.js";
 
 import {
     getAllBooks,
@@ -10,16 +11,16 @@ import {
 
 const router = express.Router();
 
-// GET - Retrieve all books
-router.get("/", getAllBooks);
+// Get all books
+router.get("/", authenticateToken, getAllBooks);
 
-// POST - Add a new book
-router.post("/", addBook);
+// Add a book
+router.post("/", authenticateToken, addBook);
 
-// PUT - Update an existing book
-router.put("/:id", updateBook);
+// Update a book
+router.put("/:id", authenticateToken, updateBook);
+
+// Delete a book
+router.delete("/:id", authenticateToken, deleteBook);
 
 export default router;
-
-// DELETE - Remove an existing book
-router.delete("/:id", deleteBook);

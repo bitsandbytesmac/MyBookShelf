@@ -1,6 +1,8 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import bookRoutes from "./src/routes/bookRoutes.js";
+import authRoutes from "./src/routes/authRoutes.js";
+import { authenticateToken } from "./src/middleware/authMiddleware.js";
 
 dotenv.config();
 
@@ -21,7 +23,17 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Protected test endpoint
+app.get("/api/protected", authenticateToken, (req, res) => {
+    res.json({
+        message: "Access granted! You are authenticated.",
+        status: "success",
+        user: req.user
+    });
+});
+
 app.use("/api/books", bookRoutes);
+app.use("/api/auth", authRoutes);
 
 // Start server
 app.listen(PORT, () => {

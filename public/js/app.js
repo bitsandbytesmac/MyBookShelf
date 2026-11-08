@@ -1,3 +1,11 @@
+// ==================================
+// CHECK USER AUTHENTICATION
+// ==================================
+
+if (!localStorage.getItem("token")) {
+    window.location.href = "/login.html";
+}
+
 function editBook(id) {
     const book = books.find(book => book.id === id);
 
@@ -27,8 +35,10 @@ async function deleteBook(id) {
     if (!confirmDelete) return;
 
     try {
+
         const response = await fetch(`/api/books/${id}`, {
-            method: "DELETE"
+            method: "DELETE",
+            headers: getAuthHeaders()
         });
 
         const result = await response.json();
@@ -67,39 +77,39 @@ const books = [];
 // LOAD BOOKS FROM BACKEND API
 // ==================================
 
-async function loadBooksFromAPI() {
-    try {
-        const response = await fetch("/api/books");
+// async function loadBooksFromAPI() {
+//     try {
+//         const response = await fetch("/api/books");
 
-        if (!response.ok) {
-            throw new Error("Failed to retrieve books.");
-        }
+//         if (!response.ok) {
+//             throw new Error("Failed to retrieve books.");
+//         }
 
-        const result = await response.json();
+//         const result = await response.json();
 
-        // Replace sample/local books with backend books.
-        books.splice(
-            0,
-            books.length,
-            ...result.data.map(book => ({
-                ...book,
-                totalPages: book.totalPages || 0,
-                currentPage: book.currentPage || 0,
-                cover: book.cover || "cover-brown"
-            }))
-        );
+//         // Replace sample/local books with backend books.
+//         books.splice(
+//             0,
+//             books.length,
+//             ...result.data.map(book => ({
+//                 ...book,
+//                 totalPages: book.totalPages || 0,
+//                 currentPage: book.currentPage || 0,
+//                 cover: book.cover || "cover-brown"
+//             }))
+//         );
 
-        // Refresh the dashboard and book list.
-        updateStatistics();
-        filterBooks();
+//         // Refresh the dashboard and book list.
+//         updateStatistics();
+//         filterBooks();
 
-        console.log("Books loaded successfully from API.");
+//         console.log("Books loaded successfully from API.");
 
-    } catch (error) {
-        console.error("Error loading books:", error);
-        alert("Unable to load books from the server.");
-    }
-}
+//     } catch (error) {
+//         console.error("Error loading books:", error);
+//         alert("Unable to load books from the server.");
+//     }
+// }
 
 
 // ==================================
@@ -179,6 +189,19 @@ let selectedBookId = null;
 // Track the currently selected bookshelf filter
 let currentStatus = "All";
 
+
+// ==================================
+// AUTHENTICATION HELPER
+// ==================================
+
+function getAuthHeaders() {
+    const token = localStorage.getItem("token");
+
+    return {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+    };
+}
 
 // ==================================
 // 4. HELPER FUNCTIONS
@@ -381,6 +404,7 @@ progressForm.addEventListener("submit", async (event) => {
         ...book,
         currentPage: updatedPage
     };
+    console.log("Updated book data:", updatedBook);
 
     // Automatically update reading status.
     if (
@@ -401,9 +425,7 @@ progressForm.addEventListener("submit", async (event) => {
     try {
         const response = await fetch(`/api/books/${book.id}`, {
             method: "PUT",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: getAuthHeaders(),
             body: JSON.stringify(updatedBook)
         });
 
@@ -414,7 +436,17 @@ progressForm.addEventListener("submit", async (event) => {
         }
 
         // Update frontend using backend response.
-        Object.assign(book, result.data);
+        Object.assign(book, {
+            id: Number(result.data.id),
+            title: result.data.title,
+            author: result.data.author,
+            genre: result.data.genre,
+            status: result.data.status,
+            totalPages: result.data.total_pages,
+            currentPage: result.data.current_page,
+            completedAt: result.data.completed_at,
+            cover: book.cover || "cover-brown"
+        });
 
         // Refresh dashboard and bookshelf.
         updateStatistics();
@@ -636,9 +668,7 @@ bookForm.addEventListener("submit", async (event) => {
         try {
             const response = await fetch(`/api/books/${id}`, {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({
                     ...updatedBook,
                     completedAt: book.completedAt || null
@@ -652,7 +682,17 @@ bookForm.addEventListener("submit", async (event) => {
             }
 
             // Update local book using backend response
-            Object.assign(book, result.data);
+            Object.assign(book, {
+                id: Number(result.data.id),
+                title: result.data.title,
+                author: result.data.author,
+                genre: result.data.genre,
+                status: result.data.status,
+                totalPages: result.data.total_pages,
+                currentPage: result.data.current_page,
+                completedAt: result.data.completed_at,
+                cover: book.cover || "cover-brown"
+            });
 
             console.log("Book updated successfully through API.");
 
@@ -679,9 +719,7 @@ bookForm.addEventListener("submit", async (event) => {
     try {
         const response = await fetch("/api/books", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: getAuthHeaders(),
             body: JSON.stringify(newBook)
         });
 
@@ -693,7 +731,14 @@ bookForm.addEventListener("submit", async (event) => {
 
         // Add the book returned by the backend.
         books.push({
-            ...result.data,
+            id: Number(result.data.id),
+            title: result.data.title,
+            author: result.data.author,
+            genre: result.data.genre,
+            status: result.data.status,
+            totalPages: result.data.total_pages,
+            currentPage: result.data.current_page,
+            completedAt: result.data.completed_at,
             cover: "cover-brown"
         });
 
@@ -705,9 +750,6 @@ bookForm.addEventListener("submit", async (event) => {
         return;
     }
 }
-
-    // Save changes to localStorage.
-    // saveBooks();
 
     // Refresh dashboard.
     updateStatistics();
@@ -725,6 +767,44 @@ bookForm.addEventListener("submit", async (event) => {
 // filterBooks();
 
 // Load books from backend when the page opens.
+async function loadBooksFromAPI() {
+    try {
+        const response = await fetch("/api/books", {
+            method: "GET",
+            headers: getAuthHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to retrieve books.");
+        }
+
+        const result = await response.json();
+
+        books.splice(
+            0,
+            books.length,
+            ...result.data.map(book => ({
+                ...book,
+                id: Number(book.id),
+                totalPages: book.total_pages || 0,
+                currentPage: book.current_page || 0,
+                completedAt: book.completed_at,
+                cover: book.cover || "cover-brown"
+            }))
+        );
+
+        updateStatistics();
+        filterBooks();
+
+        console.log("Books loaded successfully from API.");
+
+    } catch (error) {
+        console.error("Error loading books:", error);
+        alert("Unable to load books from the server.");
+    }
+}
+
+// Load books from PostgreSQL when the page opens.
 loadBooksFromAPI();
 
 // ==================================
@@ -747,3 +827,20 @@ sidebarOverlay.addEventListener("click", () => {
 
 sidebar.classList.remove("active");
 sidebarOverlay.classList.remove("active");
+
+// ==================================
+// LOGOUT
+// ==================================
+
+const logoutBtn = document.querySelector("#logoutBtn");
+
+logoutBtn.addEventListener("click", () => {
+
+    // Remove authentication data
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    // Redirect to login page
+    window.location.href = "/login.html";
+
+});

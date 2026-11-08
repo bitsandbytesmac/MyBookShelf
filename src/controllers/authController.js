@@ -1,0 +1,122 @@
+import pool from "../config/db.js";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+// Register a new user
+export async function registerUser(req, res) {
+    try {
+        const { username, email, password } = req.body;
+
+        // Check required fields
+        if (!username || !email || !password) {
+            return res.status(400).json({
+                message: "Please provide username, email, and password.",
+                status: "error"
+            });
+        }
+
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Save user in PostgreSQL
+        const newUser = await pool.query(
+            `INSERT INTO users (id, username, email, password)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, username, email, created_at`,
+            [
+                Date.now(),
+                username,
+                email,
+                hashedPassword
+            ]
+        );
+
+        res.status(201).json({
+            message: "User registered successfully!",
+            status: "success",
+            data: newUser.rows[0]
+        });
+
+    } catch (error) {
+        console.error("Registration error:", error);
+
+        res.status(500).json({
+            message: "Failed to register user.",
+            status: "error"
+        });
+    }
+}
+
+// Login an existing user
+export async function loginUser(req, res) {
+    try {
+        const { email, password } = req.body;
+
+        // Check required fields
+        if (!email || !password) {
+            return res.status(400).json({
+                message: "Please provide email and password.",
+                status: "error"
+            });
+        }
+
+        // Find user by email
+        const result = await pool.query(
+            "SELECT * FROM users WHERE email = $1",
+            [email]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({
+                message: "Invalid email or password.",
+                status: "error"
+            });
+        }
+
+        const user = result.rows[0];
+
+        // Compare entered password with stored hash
+        const isPasswordValid = await bcrypt.compare(
+            password,
+            user.password
+        );
+
+        if (!isPasswordValid) {
+            return res.status(401).json({
+                message: "Invalid email or password.",
+                status: "error"
+            });
+        }
+
+        // Generate JWT token
+        const token = jwt.sign(
+            {
+                id: user.id,
+                email: user.email
+            },
+            process.env.JWT_SECRET,
+            {
+                expiresIn: "1d"
+            }
+        );
+
+        res.json({
+            message: "Login successful!",
+            status: "success",
+            data: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                token
+            }
+        });
+
+    } catch (error) {
+        console.error("Login error:", error);
+
+        res.status(500).json({
+            message: "Failed to login.",
+            status: "error"
+        });
+    }
+}

@@ -811,38 +811,6 @@ body {
     }
 }
 
-
-
-/* MOBILE SIDEBAR */
-
-.menu-toggle {
-    display: none;
-    background: #75553F;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 9px 13px;
-    font-size: 22px;
-    cursor: pointer;
-    margin-bottom: 20px;
-}
-
-.sidebar-overlay {
-    display: none;
-}
-
-@media (max-width: 768px) {
-    .sidebar {
-        position: fixed;
-        top: 0;
-        left: -280px;
-        width: 260px;
-        height: 100vh;
-        z-index: 1100;
-        transition: left 0.3s ease;
-    }
-
-    .sideba
 /* =========================
    MOBILE SIDEBAR
 ========================= */
@@ -962,5 +930,140 @@ body {
         flex: 1 1 100%;
         font-size: 12px;
         padding: 10px 5px;
+    }
+}
+
+
+/* =========================
+   LOGIN AND REGISTER PAGES
+========================= */
+
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    background: #F8F5EF;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 430px;
+    padding: 42px 38px;
+    background: #FFFDFA;
+    border: 1px solid #EEE7DC;
+    border-radius: 18px;
+    box-shadow: 0 12px 40px rgba(68, 56, 47, 0.09);
+}
+
+.login-card h1 {
+    font-family: 'Playfair Display', serif;
+    color: #49372A;
+    text-align: center;
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.login-card > p {
+    color: #958779;
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+.login-card form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.login-card .form-group {
+    width: 100%;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.login-card label {
+    color: #594333;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.login-card input {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid #E5DCCF;
+    border-radius: 9px;
+    background: #FFFFFF;
+    color: #594333;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+}
+
+.login-card input:focus {
+    border-color: #A77B55;
+    box-shadow: 0 0 0 3px rgba(167, 123, 85, 0.12);
+}
+
+.login-card button {
+    width: 100%;
+    padding: 14px;
+    margin-top: 5px;
+    background: #75553F;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.login-card button:hover {
+    background: #59402F;
+}
+
+.login-card #loginMessage,
+.login-card #registerMessage {
+    margin-top: 15px;
+    margin-bottom: 0;
+    font-size: 13px;
+    text-align: center;
+}
+
+.login-card .register-link {
+    margin-top: 25px;
+    margin-bottom: 0;
+    font-size: 14px;
+}
+
+.login-card a {
+    color: #A66B4F;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.login-card a:hover {
+    text-decoration: underline;
+}
+
+/* MOBILE */
+@media (max-width: 480px) {
+    .login-container {
+        padding: 18px;
+    }
+
+    .login-card {
+        padding: 32px 24px;
+    }
+
+    .login-card h1 {
+        font-size: 28px;
     }
 }
