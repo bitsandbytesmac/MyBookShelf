@@ -118,9 +118,16 @@ export async function addBook(req, res) {
     }
 }
 
+
 // PUT - Update a book belonging to the authenticated user
 export async function updateBook(req, res) {
+    let client;
+
     try {
+        client = await pool.connect();
+
+        await client.query("BEGIN");
+
         const bookId = req.params.id;
 
         const {
@@ -138,6 +145,8 @@ export async function updateBook(req, res) {
         } = req.body;
 
         if (!title || !author || !genre || !status) {
+            await client.query("ROLLBACK");
+
             return res.status(400).json({
                 message: "Please provide all required book details.",
                 status: "error"
@@ -147,13 +156,36 @@ export async function updateBook(req, res) {
         const pageError = validatePageDetails(totalPages, currentPage);
 
         if (pageError) {
+            await client.query("ROLLBACK");
+
             return res.status(400).json({
                 message: pageError,
                 status: "error"
             });
         }
 
-        const updatedBook = await pool.query(
+        // 1. Retrieve the existing book before updating it.
+        const existingBook = await client.query(
+            `SELECT current_page
+             FROM books
+             WHERE id = $1 AND user_id = $2`,
+            [bookId, req.user.id]
+        );
+
+        if (existingBook.rows.length === 0) {
+            await client.query("ROLLBACK");
+
+            return res.status(404).json({
+                message: "Book not found.",
+                status: "error"
+            });
+        }
+
+        const previousPage = Number(existingBook.rows[0].current_page);
+        const newPage = Number(currentPage);
+
+        // 2. Update the book.
+        const updatedBook = await client.query(
             `UPDATE books
              SET
                 title = $1,
@@ -167,7 +199,7 @@ export async function updateBook(req, res) {
                 is_favorite = COALESCE($9, is_favorite),
                 rating = COALESCE($10, rating),
                 personal_notes = COALESCE($11, personal_notes)
-                WHERE id = $12 AND user_id = $13
+             WHERE id = $12 AND user_id = $13
              RETURNING *`,
             [
                 title,
@@ -175,7 +207,7 @@ export async function updateBook(req, res) {
                 genre,
                 status,
                 Number(totalPages),
-                Number(currentPage),
+                newPage,
                 completedAt || null,
                 coverUrl || null,
                 isFavorite ?? null,
@@ -186,12 +218,33 @@ export async function updateBook(req, res) {
             ]
         );
 
-        if (updatedBook.rows.length === 0) {
-            return res.status(404).json({
-                message: "Book not found.",
-                status: "error"
-            });
+        // 3. Record activity only when the page count increases.
+        if (newPage > previousPage) {
+            const pagesRead = newPage - previousPage;
+
+            await client.query(
+                `INSERT INTO reading_activities (
+                    user_id,
+                    book_id,
+                    book_title,
+                    previous_page,
+                    current_page,
+                    pages_read
+                )
+                VALUES ($1, $2, $3, $4, $5, $6)`,
+                [
+                    req.user.id,
+                    bookId,
+                    updatedBook.rows[0].title,
+                    previousPage,
+                    newPage,
+                    pagesRead
+                ]
+            );
         }
+
+        // 4. Commit both database changes.
+        await client.query("COMMIT");
 
         res.json({
             message: "Book updated successfully!",
@@ -200,14 +253,22 @@ export async function updateBook(req, res) {
         });
 
     } catch (error) {
+        if (client) {
+            await client.query("ROLLBACK").catch(() => {});
+        }
+
         console.error("Error updating book:", error);
 
         res.status(500).json({
             message: "Failed to update book.",
             status: "error"
         });
+
+    } finally {
+        client?.release();
     }
 }
+
 
 // DELETE - Remove a book belonging to the authenticated user
 export async function deleteBook(req, res) {

@@ -58,6 +58,8 @@ async function deleteBook(id) {
             headers: getAuthHeaders()
         });
 
+        if (handleAuthError(response)) return;
+
         const result = await response.json();
 
         if (!response.ok) {
@@ -112,6 +114,8 @@ async function toggleFavorite(id) {
             headers: getAuthHeaders(),
             body: JSON.stringify(updatedBook)
         });
+
+        if (handleAuthError(response)) return;
 
         const result = await response.json();
 
@@ -319,6 +323,32 @@ function getAuthHeaders() {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
     };
+}
+
+// Prevent multiple session expiration alerts.
+let isHandlingAuthError = false;
+
+// Handle expired or invalid authentication sessions.
+function handleAuthError(response) {
+    if (response.status === 401 || response.status === 403) {
+
+        if (isHandlingAuthError) {
+            return true;
+        }
+
+        isHandlingAuthError = true;
+
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+
+        alert("Your session has expired. Please log in again.");
+
+        window.location.href = "/login.html";
+
+        return true;
+    }
+
+    return false;
 }
 
 // ==================================
@@ -773,6 +803,8 @@ progressForm.addEventListener("submit", async (event) => {
             body: JSON.stringify(updatedBook)
         });
 
+        if (handleAuthError(response)) return;
+
         const result = await response.json();
 
         if (!response.ok) {
@@ -1126,6 +1158,8 @@ try {
         body: JSON.stringify(newBook)
     });
 
+    if (handleAuthError(response)) return;
+
     const result = await response.json();
 
     if (!response.ok) {
@@ -1181,6 +1215,8 @@ async function loadBooksFromAPI() {
             headers: getAuthHeaders()
         });
 
+        if (handleAuthError(response)) return;
+
         if (!response.ok) {
             throw new Error("Failed to retrieve books.");
         }
@@ -1215,8 +1251,128 @@ async function loadBooksFromAPI() {
     }
 }
 
+// Load reading activities from backend.
+async function loadActivitiesFromAPI() {
+    try {
+        const response = await fetch("/api/activities", {
+            method: "GET",
+            headers: getAuthHeaders()
+        });
+
+        if (handleAuthError(response)) return;
+
+        if (!response.ok) {
+            throw new Error("Failed to retrieve reading activities.");
+        }
+
+        const result = await response.json();
+
+        displayActivities(result.data);
+
+        console.log("Reading activities loaded successfully:", result.data);
+
+    } catch (error) {
+        console.error("Error loading reading activities:", error);
+    }
+}
+
+// Display recent reading activities on the dashboard.
+function displayActivities(activities) {
+    const activityContainer = document.getElementById("activityContainer");
+
+    activityContainer.innerHTML = "";
+
+    if (activities.length === 0) {
+        activityContainer.innerHTML = `
+            <p class="empty-activity">
+                No reading activity yet. Start reading a book!
+            </p>
+        `;
+        return;
+    }
+
+    activities.forEach(activity => {
+        const activityItem = document.createElement("div");
+        activityItem.classList.add("activity-item");
+
+        const activityDate = new Date(activity.created_at);
+
+        const formattedDate = activityDate.toLocaleString("en-PH", {
+            dateStyle: "medium",
+            timeStyle: "short"
+        });
+
+        activityItem.innerHTML = `
+            <div class="activity-details">
+                <h3>${activity.book_title}</h3>
+                <p>
+                    Pages ${activity.previous_page} → ${activity.current_page}
+                </p>
+                <span>${formattedDate}</span>
+            </div>
+
+            <div class="activity-pages">
+                +${activity.pages_read} pages
+            </div>
+        `;
+
+        activityContainer.appendChild(activityItem);
+    });
+}
+
+// Display reading statistics on the dashboard.
+function displayReadingStatistics(statistics) {
+    document.getElementById("pagesToday").textContent =
+        Number(statistics.pagesToday).toLocaleString("en-PH");
+
+    document.getElementById("pagesThisWeek").textContent =
+        Number(statistics.pagesThisWeek).toLocaleString("en-PH");
+
+    document.getElementById("pagesThisMonth").textContent =
+        Number(statistics.pagesThisMonth).toLocaleString("en-PH");
+
+    const mostReadBook = document.getElementById("mostReadBook");
+    const mostReadBookPages = document.getElementById("mostReadBookPages");
+
+    if (statistics.mostReadBook) {
+        mostReadBook.textContent = statistics.mostReadBook.book_title;
+
+        mostReadBookPages.textContent =
+            `${Number(statistics.mostReadBook.total_pages_read).toLocaleString("en-PH")} pages recorded`;
+    } else {
+        mostReadBook.textContent = "—";
+        mostReadBookPages.textContent = "No reading activity yet";
+    }
+}
+
+// Load reading statistics from the backend.
+async function loadReadingStatisticsFromAPI() {
+    try {
+        const response = await fetch("/api/activities/statistics", {
+            method: "GET",
+            headers: getAuthHeaders()
+        });
+
+        if (handleAuthError(response)) return;
+
+        if (!response.ok) {
+            throw new Error("Failed to retrieve reading statistics.");
+        }
+
+        const result = await response.json();
+
+        displayReadingStatistics(result.data);
+
+        console.log("Reading statistics loaded successfully:", result.data);
+
+    } catch (error) {
+        console.error("Error loading reading statistics:", error);
+    }
+}
 // Load books from PostgreSQL when the page opens.
 loadBooksFromAPI();
+loadActivitiesFromAPI();
+loadReadingStatisticsFromAPI();
 
 // ==================================
 // MOBILE SIDEBAR

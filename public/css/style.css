@@ -1364,3 +1364,86 @@ body {
     color: #FFFFFF;
     border-color: #B85C5C;
 }
+
+/* ==================================
+   RECENT READING ACTIVITY
+================================== */
+
+.activity-section {
+    margin-bottom: 35px;
+}
+
+.activity-container {
+    background: #FFFFFF;
+    border: 1px solid #E5DCCF;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 18px;
+}
+
+.empty-activity {
+    color: #A69A8D;
+    font-size: 14px;
+    text-align: center;
+    padding: 20px 0;
+}
+
+/* Individual activity item */
+.activity-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    padding: 18px 5px;
+    border-bottom: 1px solid #F0EAE2;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-details h3 {
+    color: #594333;
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    margin-bottom: 6px;
+}
+
+.activity-details p {
+    color: #806B59;
+    font-size: 13px;
+    margin-bottom: 5px;
+}
+
+.activity-details span {
+    color: #A69A8D;
+    font-size: 12px;
+}
+
+.activity-pages {
+    color: #A77B55;
+    background: #F8F1E8;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Mobile activity layout */
+@media (max-width: 600px) {
+    .activity-item {
+        align-items: flex-start;
+    }
+
+    .activity-pages {
+        font-size: 12px;
+        padding: 7px 9px;
+    }
+}
+
+.most-read-book {
+    font-size: 18px;
+    line-height: 1.4;
+    overflow-wrap: break-word;
+}

@@ -5,6 +5,7 @@ import authRoutes from "./src/routes/authRoutes.js";
 import { authenticateToken } from "./src/middleware/authMiddleware.js";
 import googleBooksRoutes from "./src/routes/googleBooksRoutes.js";
 import uploadRoutes from "./src/routes/uploadRoutes.js";
+import activityRoutes from "./src/routes/activityRoutes.js";
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.use("/api/books", bookRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/google-books", googleBooksRoutes);
 app.use("/api/uploads", uploadRoutes);
+app.use("/api/activities", activityRoutes);
 
 // Start server
 app.listen(PORT, () => {

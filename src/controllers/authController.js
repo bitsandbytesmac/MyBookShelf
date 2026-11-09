@@ -38,13 +38,34 @@ export async function registerUser(req, res) {
         });
 
     } catch (error) {
-        console.error("Registration error:", error);
 
-        res.status(500).json({
-            message: "Failed to register user.",
+    // Handle duplicate username or email.
+    if (error.code === "23505") {
+
+        let message = "Username or email already exists.";
+
+        if (error.constraint === "users_username_key") {
+            message = "Username already exists. Please choose another.";
+        }
+
+        if (error.constraint === "users_email_key") {
+            message = "Email already exists. Please use another email.";
+        }
+
+        return res.status(409).json({
+            message,
             status: "error"
         });
     }
+
+    console.error("Registration error:", error);
+
+    return res.status(500).json({
+        message: "Failed to register user.",
+        status: "error"
+    });
+}
+
 }
 
 // Login an existing user
