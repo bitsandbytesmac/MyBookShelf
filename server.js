@@ -18,6 +18,11 @@ app.use(express.json());
 // Serve frontend files
 app.use(express.static('public'));
 
+// Serve the homepage when users visit the root URL
+app.get("/", (req, res) => {
+    res.sendFile("index.html", { root: "public" });
+});
+
 // First API endpoint
 app.get('/api/health', (req, res) => {
     res.json({
