@@ -20,7 +20,7 @@ app.use(express.static('public'));
 
 // Serve the homepage when users visit the root URL
 app.get("/", (req, res) => {
-    res.sendFile("index.html", { root: "public" });
+    res.redirect("/index.html");
 });
 
 // First API endpoint
