@@ -43,7 +43,12 @@ app.use("/api/google-books", googleBooksRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/activities", activityRoutes);
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`MyBookShelf running at http://localhost:${PORT}`);
-});
+// Start server locally
+if (process.env.NODE_ENV !== "production") {
+    app.listen(PORT, () => {
+        console.log(`MyBookShelf running at http://localhost:${PORT}`);
+    });
+}
+
+// Export Express app for Vercel
+export default app;
