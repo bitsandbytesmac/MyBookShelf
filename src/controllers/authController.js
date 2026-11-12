@@ -113,7 +113,8 @@ export async function loginUser(req, res) {
         const token = jwt.sign(
             {
                 id: user.id,
-                email: user.email
+                email: user.email,
+                tv: user.token_version ?? 0   // session version; see authMiddleware
             },
             process.env.JWT_SECRET,
             {

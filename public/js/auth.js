@@ -1,4 +1,4 @@
-// Login and registration pages.
+// Login, registration, forgot-password and reset-password pages.
 import { api } from "./api.js";
 
 const errorEl = document.getElementById("formError");
@@ -8,6 +8,14 @@ const notice = sessionStorage.getItem("authMessage");
 if (notice && errorEl) {
     errorEl.textContent = notice;
     sessionStorage.removeItem("authMessage");
+}
+
+// Success message left behind by a password reset.
+const successNotice = sessionStorage.getItem("authNotice");
+const noticeEl = document.getElementById("formNotice");
+if (successNotice && noticeEl) {
+    noticeEl.textContent = successNotice;
+    sessionStorage.removeItem("authNotice");
 }
 
 function storeSession(data) {
@@ -99,6 +107,110 @@ if (registerForm) {
         } catch (error) {
             errorEl.textContent = error.message;
             setBusy(registerForm, false, "Create account");
+        }
+    });
+}
+
+// Pass the email typed on the login page along to "Forgot password?".
+const forgotLink = document.getElementById("forgotLink");
+if (forgotLink && loginForm) {
+    forgotLink.addEventListener("click", () => {
+        const email = loginForm.email.value.trim();
+        forgotLink.href = email ? `forgot-password.html?email=${encodeURIComponent(email)}` : "forgot-password.html";
+    });
+}
+
+// ---------- Forgot password ----------
+
+const forgotForm = document.getElementById("forgotForm");
+
+if (forgotForm) {
+    const requestStep = document.getElementById("requestStep");
+    const sentStep = document.getElementById("sentStep");
+
+    // Carry over an email typed on the login page.
+    const prefill = new URLSearchParams(location.search).get("email");
+    if (prefill) forgotForm.email.value = prefill;
+
+    forgotForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        errorEl.textContent = "";
+
+        const email = forgotForm.email.value.trim();
+        if (!validEmail(email)) {
+            errorEl.textContent = "Enter a valid email address.";
+            forgotForm.email.focus();
+            return;
+        }
+
+        setBusy(forgotForm, true, "Sending…");
+        try {
+            const result = await api.forgotPassword(email);
+            document.getElementById("sentMessage").textContent = result.message;
+            requestStep.classList.add("hidden");
+            sentStep.classList.remove("hidden");
+        } catch (error) {
+            errorEl.textContent = error.message;
+        } finally {
+            setBusy(forgotForm, false, "Send reset link");
+        }
+    });
+
+    document.getElementById("tryAgain").addEventListener("click", () => {
+        sentStep.classList.add("hidden");
+        requestStep.classList.remove("hidden");
+        forgotForm.email.focus();
+    });
+}
+
+// ---------- Reset password ----------
+
+const resetForm = document.getElementById("resetForm");
+
+if (resetForm) {
+    const token = new URLSearchParams(location.search).get("token") || "";
+
+    // Keep the token out of browser history and address-bar screenshots.
+    if (location.search) history.replaceState(null, "", location.pathname);
+
+    const showInvalid = (message) => {
+        if (message) document.getElementById("invalidMessage").textContent = message;
+        document.getElementById("resetStep").classList.add("hidden");
+        document.getElementById("invalidStep").classList.remove("hidden");
+    };
+
+    if (!/^[a-f0-9]{64}$/.test(token)) showInvalid();
+
+    resetForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        errorEl.textContent = "";
+
+        const password = resetForm.password.value;
+        const confirm = resetForm.confirmPassword.value;
+
+        if (password.length < 8) {
+            errorEl.textContent = "Password must be at least 8 characters.";
+            resetForm.password.focus();
+            return;
+        }
+        if (password !== confirm) {
+            errorEl.textContent = "The passwords don't match.";
+            resetForm.confirmPassword.focus();
+            return;
+        }
+
+        setBusy(resetForm, true, "Updating…");
+        try {
+            await api.resetPassword(token, password);
+            // Any old session on this device belongs to the previous password.
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            sessionStorage.setItem("authNotice", "Password updated. Log in with your new password.");
+            location.replace("/login.html");
+        } catch (error) {
+            if (error.status === 400 && /expired|invalid|already used/i.test(error.message)) showInvalid(error.message);
+            else errorEl.textContent = error.message;
+            setBusy(resetForm, false, "Update password");
         }
     });
 }

@@ -45,7 +45,9 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
     }
 
     if (auth && response.status === 401) {
-        logout("Your session expired. Please log in again.");
+        logout(result.message && !/no token/i.test(result.message)
+            ? result.message
+            : "Your session expired. Please log in again.");
         throw new ApiError("Session expired.", 401);
     }
     if (!response.ok) {
@@ -115,6 +117,12 @@ export const api = {
 
     register: (username, email, password) =>
         request("/api/auth/register", { method: "POST", body: { username, email, password }, auth: false }),
+
+    forgotPassword: (email) =>
+        request("/api/auth/forgot-password", { method: "POST", body: { email }, auth: false }),
+
+    resetPassword: (token, password) =>
+        request("/api/auth/reset-password", { method: "POST", body: { token, password }, auth: false }),
 
     async getBooks() {
         return (await request("/api/books")).data.map(normalizeBook);
