@@ -6,6 +6,10 @@ dotenv.config();
 
 const { Pool } = pg;
 
+// Return DATE columns as "YYYY-MM-DD" strings. The default converts them to a
+// local-midnight Date, which shifts a day when serialized to UTC JSON.
+pg.types.setTypeParser(1082, (value) => value);
+
 let pool;
 
 if (process.env.DATABASE_URL) {

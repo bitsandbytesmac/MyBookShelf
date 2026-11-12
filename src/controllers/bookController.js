@@ -1,304 +1,217 @@
-
 import pool from "../config/db.js";
 
-// Validate book page information
-function validatePageDetails(totalPages, currentPage) {
-    const total = Number(totalPages);
-    const current = Number(currentPage);
+export const BOOK_STATUSES = ["To Be Read", "Reading", "Read", "DNF", "Paused"];
+export const BOOK_FORMATS = ["Paperback", "Hardbound", "E-book", "Audiobook"];
+export const BOOK_OWNERSHIP = ["Owned", "Borrowed", "Gifted"];
 
-    if (!Number.isInteger(total) || total < 0) {
-        return "Total pages must be a valid non-negative number.";
-    }
+const LIMITS = { text: 300, summary: 10000, longText: 20000, tags: 20, tag: 60, quotes: 100, quote: 2000 };
 
-    if (!Number.isInteger(current) || current < 0) {
-        return "Current page must be a valid non-negative number.";
-    }
+// ---------- Validation ----------
 
-    if (current > total) {
-        return "Current page cannot exceed total pages.";
-    }
-
-    return null;
+function optionalText(value, max, label) {
+    if (value === undefined || value === null || value === "") return { value: null };
+    if (typeof value !== "string") return { error: `${label} must be text.` };
+    const trimmed = value.trim();
+    if (trimmed.length > max) return { error: `${label} is too long (max ${max} characters).` };
+    return { value: trimmed || null };
 }
 
-// GET - Retrieve all books belonging to the authenticated user
+function stringList(value, maxItems, maxLength, label) {
+    if (value === undefined || value === null) return { value: [] };
+    if (!Array.isArray(value)) return { error: `${label} must be a list.` };
+    const cleaned = [...new Set(value.map((v) => (typeof v === "string" ? v.trim() : "")).filter(Boolean))];
+    if (cleaned.length > maxItems) return { error: `Too many ${label.toLowerCase()} (max ${maxItems}).` };
+    if (cleaned.some((v) => v.length > maxLength)) return { error: `Each ${label.toLowerCase().replace(/s$/, "")} must be under ${maxLength} characters.` };
+    return { value: cleaned };
+}
+
+function optionalChoice(value, choices, label) {
+    if (value === undefined || value === null || value === "") return { value: null };
+    if (!choices.includes(value)) return { error: `${label} must be one of: ${choices.join(", ")}.` };
+    return { value };
+}
+
+function optionalScore(value, label) {
+    if (value === undefined || value === null || value === "" || value === 0) return { value: null };
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 1 || n > 5) return { error: `${label} must be between 1 and 5.` };
+    return { value: n };
+}
+
+function optionalDate(value, label) {
+    if (value === undefined || value === null || value === "") return { value: null };
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value))) {
+        return { error: `${label} must be a valid date.` };
+    }
+    return { value };
+}
+
+function pageNumber(value, label) {
+    if (value === undefined || value === null || value === "") return { value: 0 };
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 0 || n > 100000) return { error: `${label} must be a whole number.` };
+    return { value: n };
+}
+
+// Turns a request body into column values, or returns the first validation error.
+function parseBook(body = {}) {
+    const values = {};
+    const checks = {
+        title: optionalText(body.title, LIMITS.text, "Title"),
+        author: optionalText(body.author, LIMITS.text, "Author"),
+        summary: optionalText(body.summary, LIMITS.summary, "Summary"),
+        cover_url: optionalText(body.coverUrl, 2000, "Cover URL"),
+        genres: stringList(body.genres, LIMITS.tags, LIMITS.tag, "Genres"),
+        subgenres: stringList(body.subgenres, LIMITS.tags, LIMITS.tag, "Sub-genres"),
+        format: optionalChoice(body.format, BOOK_FORMATS, "Format"),
+        ownership: optionalChoice(body.ownership, BOOK_OWNERSHIP, "Ownership"),
+        status: optionalChoice(body.status || "To Be Read", BOOK_STATUSES, "Book status"),
+        total_pages: pageNumber(body.totalPages, "Total pages"),
+        current_page: pageNumber(body.currentPage, "Current page"),
+        rating: optionalScore(body.rating, "Rating"),
+        spice: optionalScore(body.spice, "Spice"),
+        quotes: stringList(body.quotes, LIMITS.quotes, LIMITS.quote, "Quotes"),
+        review: optionalText(body.review, LIMITS.longText, "Review"),
+        personal_notes: optionalText(body.notes, LIMITS.longText, "Notes"),
+        date_started: optionalDate(body.dateStarted, "Date started"),
+        date_finished: optionalDate(body.dateFinished, "Date finished")
+    };
+
+    for (const [column, result] of Object.entries(checks)) {
+        if (result.error) return { error: result.error };
+        values[column] = result.value;
+    }
+
+    if (!values.title) return { error: "Please provide a title." };
+    if (!values.author) return { error: "Please provide an author." };
+
+    if (values.total_pages > 0 && values.current_page > values.total_pages) {
+        return { error: "Current page cannot exceed total pages." };
+    }
+    if (values.date_started && values.date_finished && values.date_finished < values.date_started) {
+        return { error: "Date finished can't be before date started." };
+    }
+
+    values.is_favorite = Boolean(body.isFavorite);
+    values.genre = values.genres[0] || "";                     // legacy single-genre column
+    values.completed_at = values.date_finished;                 // legacy completion column
+
+    return { values };
+}
+
+const COLUMNS = [
+    "title", "author", "summary", "cover_url", "genres", "subgenres", "format", "ownership", "status",
+    "total_pages", "current_page", "rating", "spice", "quotes", "review", "personal_notes",
+    "date_started", "date_finished", "is_favorite", "genre", "completed_at"
+];
+
+function sendError(res, status, message) {
+    return res.status(status).json({ message, status: "error" });
+}
+
+// ---------- Handlers ----------
+
+// GET - all books belonging to the authenticated user
 export async function getAllBooks(req, res) {
     try {
         const result = await pool.query(
-            "SELECT * FROM books WHERE user_id = $1 ORDER BY id ASC",
+            "SELECT * FROM books WHERE user_id = $1 ORDER BY id DESC",
             [req.user.id]
         );
-
-        res.json({
-            message: "Books retrieved successfully!",
-            status: "success",
-            data: result.rows
-        });
-
+        res.json({ message: "Books retrieved successfully!", status: "success", data: result.rows });
     } catch (error) {
         console.error("Error retrieving books:", error);
-
-        res.status(500).json({
-            message: "Failed to retrieve books.",
-            status: "error"
-        });
+        sendError(res, 500, "Failed to retrieve books.");
     }
 }
 
-// POST - Add a new book
+// POST - add a new book
 export async function addBook(req, res) {
+    const { values, error } = parseBook(req.body);
+    if (error) return sendError(res, 400, error);
+
     try {
-        const {
-            title,
-            author,
-            genre,
-            status,
-            totalPages,
-            currentPage,
-            completedAt,
-            coverUrl,
-            isFavorite,
-            rating,
-            personalNotes
-        } = req.body;
-
-        if (!title || !author || !genre || !status) {
-            return res.status(400).json({
-                message: "Please provide all required book details.",
-                status: "error"
-            });
-        }
-
-        const pageError = validatePageDetails(totalPages, currentPage);
-
-        if (pageError) {
-            return res.status(400).json({
-                message: pageError,
-                status: "error"
-            });
-        }
+        const columns = ["id", "user_id", ...COLUMNS];
+        const params = [Date.now(), req.user.id, ...COLUMNS.map((c) => values[c])];
+        const placeholders = params.map((_, i) => `$${i + 1}`).join(", ");
 
         const result = await pool.query(
-            `INSERT INTO books (
-                id, title, author, genre, status,
-                total_pages, current_page, completed_at, user_id, cover_url, is_favorite, rating, personal_notes
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-            RETURNING *`,
-            [
-                Date.now(),
-                title,
-                author,
-                genre,
-                status,
-                Number(totalPages),
-                Number(currentPage),
-                completedAt || null,
-                req.user.id,
-                coverUrl || null,
-                isFavorite || false,
-                rating || null,
-                personalNotes || null
-            ]
+            `INSERT INTO books (${columns.join(", ")}) VALUES (${placeholders}) RETURNING *`,
+            params
         );
 
-        res.status(201).json({
-            message: "Book added successfully!",
-            status: "success",
-            data: result.rows[0]
-        });
-
-    } catch (error) {
-        console.error("Error adding book:", error);
-
-        res.status(500).json({
-            message: "Failed to add book.",
-            status: "error"
-        });
+        res.status(201).json({ message: "Book added successfully!", status: "success", data: result.rows[0] });
+    } catch (err) {
+        console.error("Error adding book:", err);
+        sendError(res, 500, "Failed to add book.");
     }
 }
 
-
-// PUT - Update a book belonging to the authenticated user
+// PUT - replace a book's details (the client always sends the full book)
 export async function updateBook(req, res) {
+    const { values, error } = parseBook(req.body);
+    if (error) return sendError(res, 400, error);
+
     let client;
 
     try {
         client = await pool.connect();
-
         await client.query("BEGIN");
 
-        const bookId = req.params.id;
-
-        const {
-            title,
-            author,
-            genre,
-            status,
-            totalPages,
-            currentPage,
-            completedAt,
-            coverUrl,
-            isFavorite,
-            rating,
-            personalNotes
-        } = req.body;
-
-        if (!title || !author || !genre || !status) {
-            await client.query("ROLLBACK");
-
-            return res.status(400).json({
-                message: "Please provide all required book details.",
-                status: "error"
-            });
-        }
-
-        const pageError = validatePageDetails(totalPages, currentPage);
-
-        if (pageError) {
-            await client.query("ROLLBACK");
-
-            return res.status(400).json({
-                message: pageError,
-                status: "error"
-            });
-        }
-
-        // 1. Retrieve the existing book before updating it.
-        const existingBook = await client.query(
-            `SELECT current_page
-             FROM books
-             WHERE id = $1 AND user_id = $2`,
-            [bookId, req.user.id]
+        const existing = await client.query(
+            "SELECT current_page FROM books WHERE id = $1 AND user_id = $2 FOR UPDATE",
+            [req.params.id, req.user.id]
         );
 
-        if (existingBook.rows.length === 0) {
+        if (existing.rows.length === 0) {
             await client.query("ROLLBACK");
-
-            return res.status(404).json({
-                message: "Book not found.",
-                status: "error"
-            });
+            return sendError(res, 404, "Book not found.");
         }
 
-        const previousPage = Number(existingBook.rows[0].current_page);
-        const newPage = Number(currentPage);
+        const previousPage = Number(existing.rows[0].current_page) || 0;
+        const assignments = COLUMNS.map((c, i) => `${c} = $${i + 1}`).join(", ");
+        const params = [...COLUMNS.map((c) => values[c]), req.params.id, req.user.id];
 
-        // 2. Update the book.
-        const updatedBook = await client.query(
-            `UPDATE books
-             SET
-                title = $1,
-                author = $2,
-                genre = $3,
-                status = $4,
-                total_pages = $5,
-                current_page = $6,
-                completed_at = $7,
-                cover_url = COALESCE($8, cover_url),
-                is_favorite = COALESCE($9, is_favorite),
-                rating = COALESCE($10, rating),
-                personal_notes = COALESCE($11, personal_notes)
-             WHERE id = $12 AND user_id = $13
+        const updated = await client.query(
+            `UPDATE books SET ${assignments}
+             WHERE id = $${COLUMNS.length + 1} AND user_id = $${COLUMNS.length + 2}
              RETURNING *`,
-            [
-                title,
-                author,
-                genre,
-                status,
-                Number(totalPages),
-                newPage,
-                completedAt || null,
-                coverUrl || null,
-                isFavorite ?? null,
-                rating ?? null,
-                personalNotes ?? null,
-                bookId,
-                req.user.id
-            ]
+            params
         );
 
-        // 3. Record activity only when the page count increases.
-        if (newPage > previousPage) {
-            const pagesRead = newPage - previousPage;
-
+        // Log a reading session whenever the page count goes up.
+        if (values.current_page > previousPage) {
             await client.query(
-                `INSERT INTO reading_activities (
-                    user_id,
-                    book_id,
-                    book_title,
-                    previous_page,
-                    current_page,
-                    pages_read
-                )
-                VALUES ($1, $2, $3, $4, $5, $6)`,
-                [
-                    req.user.id,
-                    bookId,
-                    updatedBook.rows[0].title,
-                    previousPage,
-                    newPage,
-                    pagesRead
-                ]
+                `INSERT INTO reading_activities (user_id, book_id, book_title, previous_page, current_page, pages_read)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [req.user.id, req.params.id, values.title, previousPage, values.current_page, values.current_page - previousPage]
             );
         }
 
-        // 4. Commit both database changes.
         await client.query("COMMIT");
-
-        res.json({
-            message: "Book updated successfully!",
-            status: "success",
-            data: updatedBook.rows[0]
-        });
-
-    } catch (error) {
-        if (client) {
-            await client.query("ROLLBACK").catch(() => {});
-        }
-
-        console.error("Error updating book:", error);
-
-        res.status(500).json({
-            message: "Failed to update book.",
-            status: "error"
-        });
-
+        res.json({ message: "Book updated successfully!", status: "success", data: updated.rows[0] });
+    } catch (err) {
+        if (client) await client.query("ROLLBACK").catch(() => {});
+        console.error("Error updating book:", err);
+        sendError(res, 500, "Failed to update book.");
     } finally {
         client?.release();
     }
 }
 
-
-// DELETE - Remove a book belonging to the authenticated user
+// DELETE - remove a book
 export async function deleteBook(req, res) {
     try {
-        const bookId = req.params.id;
-
-        const deletedBook = await pool.query(
-            "DELETE FROM books WHERE id = $1 AND user_id = $2 RETURNING *",
-            [bookId, req.user.id]
+        const deleted = await pool.query(
+            "DELETE FROM books WHERE id = $1 AND user_id = $2 RETURNING id",
+            [req.params.id, req.user.id]
         );
 
-        if (deletedBook.rows.length === 0) {
-            return res.status(404).json({
-                message: "Book not found.",
-                status: "error"
-            });
-        }
+        if (deleted.rows.length === 0) return sendError(res, 404, "Book not found.");
 
-        res.json({
-            message: "Book deleted successfully!",
-            status: "success",
-            data: deletedBook.rows[0]
-        });
-
+        res.json({ message: "Book deleted successfully!", status: "success", data: deleted.rows[0] });
     } catch (error) {
         console.error("Error deleting book:", error);
-
-        res.status(500).json({
-            message: "Failed to delete book.",
-            status: "error"
-        });
+        sendError(res, 500, "Failed to delete book.");
     }
 }

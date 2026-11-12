@@ -1,124 +1,104 @@
-// Redirect to dashboard if already logged in
-if (localStorage.getItem("token")) {
-    window.location.href = "/";
+// Login and registration pages.
+import { api } from "./api.js";
+
+const errorEl = document.getElementById("formError");
+
+// Message left behind by an expired session.
+const notice = sessionStorage.getItem("authMessage");
+if (notice && errorEl) {
+    errorEl.textContent = notice;
+    sessionStorage.removeItem("authMessage");
 }
 
-// ==================================
-// LOGIN FORM
-// ==================================
+function storeSession(data) {
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("user", JSON.stringify({ id: data.id, username: data.username, email: data.email }));
+}
+
+function setBusy(form, busy, label) {
+    const button = form.querySelector("button[type='submit']");
+    button.disabled = busy;
+    if (label) button.textContent = label;
+}
+
+function validEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+// ---------- Login ----------
 
 const loginForm = document.getElementById("loginForm");
 
 if (loginForm) {
-
-    const loginMessage = document.getElementById("loginMessage");
-
-    loginForm.addEventListener("submit", async function (event) {
-
+    loginForm.addEventListener("submit", async (event) => {
         event.preventDefault();
+        errorEl.textContent = "";
 
-        const email = document.getElementById("email").value;
-        const password = document.getElementById("password").value;
+        const email = loginForm.email.value.trim();
+        const password = loginForm.password.value;
 
-        try {
-
-            const response = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    email,
-                    password
-                })
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message);
-            }
-
-            localStorage.setItem("token", result.data.token);
-
-            localStorage.setItem("user", JSON.stringify({
-                id: result.data.id,
-                username: result.data.username,
-                email: result.data.email
-            }));
-
-            loginMessage.textContent = "Login successful!";
-
-            window.location.href = "/";
-
-        } catch (error) {
-
-            loginMessage.textContent = error.message;
-            loginMessage.style.color = "#C0392B";
-
+        if (!validEmail(email)) {
+            errorEl.textContent = "Enter a valid email address.";
+            loginForm.email.focus();
+            return;
+        }
+        if (!password) {
+            errorEl.textContent = "Enter your password.";
+            loginForm.password.focus();
+            return;
         }
 
+        setBusy(loginForm, true, "Logging in…");
+        try {
+            const result = await api.login(email, password);
+            storeSession(result.data);
+            location.replace("/");
+        } catch (error) {
+            errorEl.textContent = error.message;
+            setBusy(loginForm, false, "Log in");
+        }
     });
-
 }
 
-
-// ==================================
-// REGISTRATION FORM
-// ==================================
+// ---------- Register ----------
 
 const registerForm = document.getElementById("registerForm");
 
 if (registerForm) {
-
-    const registerMessage = document.getElementById("registerMessage");
-
-    registerForm.addEventListener("submit", async function (event) {
-
-        // Prevent page refresh
+    registerForm.addEventListener("submit", async (event) => {
         event.preventDefault();
+        errorEl.textContent = "";
 
-        // Get input values
-        const username = document.getElementById("username").value;
-        const email = document.getElementById("registerEmail").value;
-        const password = document.getElementById("registerPassword").value;
+        const username = registerForm.username.value.trim();
+        const email = registerForm.email.value.trim();
+        const password = registerForm.password.value;
 
-        try {
-
-            // Send registration request to backend
-            const response = await fetch("/api/auth/register", {
-                method: "POST",
-
-                headers: {
-                    "Content-Type": "application/json"
-                },
-
-                body: JSON.stringify({
-                    username,
-                    email,
-                    password
-                })
-            });
-
-            const result = await response.json();
-
-            // Check registration result
-            if (!response.ok) {
-                throw new Error(result.message);
-            }
-
-            alert("Account created successfully!");
-
-            // Redirect to login page
-            window.location.href = "/login.html";
-
-        } catch (error) {
-
-            registerMessage.textContent = error.message;
-            registerMessage.style.color = "#C0392B";
-
+        if (!username) {
+            errorEl.textContent = "Enter your name.";
+            registerForm.username.focus();
+            return;
+        }
+        if (!validEmail(email)) {
+            errorEl.textContent = "Enter a valid email address.";
+            registerForm.email.focus();
+            return;
+        }
+        if (password.length < 8) {
+            errorEl.textContent = "Password must be at least 8 characters.";
+            registerForm.password.focus();
+            return;
         }
 
+        setBusy(registerForm, true, "Creating account…");
+        try {
+            await api.register(username, email, password);
+            // Sign straight in so the new user lands on their shelf.
+            const result = await api.login(email, password);
+            storeSession(result.data);
+            location.replace("/");
+        } catch (error) {
+            errorEl.textContent = error.message;
+            setBusy(registerForm, false, "Create account");
+        }
     });
-
 }

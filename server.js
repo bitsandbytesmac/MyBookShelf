@@ -6,6 +6,7 @@ import { authenticateToken } from "./src/middleware/authMiddleware.js";
 import googleBooksRoutes from "./src/routes/googleBooksRoutes.js";
 import uploadRoutes from "./src/routes/uploadRoutes.js";
 import activityRoutes from "./src/routes/activityRoutes.js";
+import goalRoutes from "./src/routes/goalRoutes.js";
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/google-books", googleBooksRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/activities", activityRoutes);
+app.use("/api/goals", goalRoutes);
 
 // Start server locally
 if (process.env.NODE_ENV !== "production") {
@@ -54,6 +56,21 @@ if (process.env.NODE_ENV !== "production") {
         console.log(`MyBookShelf running at http://localhost:${PORT}`);
     });
 }
+
+// Unknown API routes return JSON instead of an HTML page
+app.use("/api", (req, res) => {
+    res.status(404).json({ status: "error", message: "Route not found" });
+});
+
+// Central error handler (must come after all routes)
+app.use((err, req, res, next) => {
+    console.error(err);
+    const status = err.status || 500;
+    res.status(status).json({
+        status: "error",
+        message: status < 500 ? err.message : "Something went wrong"
+    });
+});
 
 // Export Express app for Vercel
 export default app;
