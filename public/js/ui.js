@@ -224,9 +224,9 @@ export function toast(message, { error = false } = {}) {
 
 // Builds a <dialog>, shows it, removes it on close.
 // body: Node; footer: array of Nodes; onSubmit: async () => boolean|void (false keeps it open).
-export function modal({ title, body, footer = [], size, onSubmit, submitLabel = "Save", initialFocus }) {
+export function modal({ title, body, footer = [], size, onSubmit, submitLabel = "Save", busyLabel = "Saving…", danger = false, initialFocus }) {
     const errorEl = h("p", { class: "form-error", "aria-live": "polite" });
-    const submitBtn = onSubmit ? h("button", { type: "submit", class: "btn btn-primary" }, submitLabel) : null;
+    const submitBtn = onSubmit ? h("button", { type: "submit", class: danger ? "btn btn-danger-solid" : "btn btn-primary" }, submitLabel) : null;
 
     const form = h("form", { class: "dialog-form", novalidate: true },
         h("div", { class: "dialog-head" },
@@ -259,7 +259,7 @@ export function modal({ title, body, footer = [], size, onSubmit, submitLabel = 
         errorEl.textContent = "";
         submitBtn.disabled = true;
         const label = submitBtn.textContent;
-        submitBtn.textContent = "Saving…";
+        submitBtn.textContent = busyLabel;
         try {
             const keepOpen = (await onSubmit({ setError: (m) => (errorEl.textContent = m) })) === false;
             if (!keepOpen) close();

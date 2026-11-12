@@ -1,11 +1,11 @@
 // App entry: routing, nav, account menu, initial load.
-import { logout } from "./api.js";
+import { api, logout } from "./api.js";
 import { loadAll, subscribe } from "./store.js";
 import { renderDashboard, currentUser } from "./dashboard.js";
 import { renderLibrary } from "./library.js";
 import { renderBookPage } from "./bookPage.js";
 import { openAddBook } from "./dialogs.js";
-import { h, toast } from "./ui.js";
+import { h, modal, toast } from "./ui.js";
 
 const view = document.getElementById("view");
 
@@ -101,6 +101,38 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") setMenu(false);
 });
 document.getElementById("logoutBtn").addEventListener("click", () => logout());
+
+document.getElementById("deleteAccountBtn").addEventListener("click", () => {
+    setMenu(false);
+    const password = h("input", { class: "input", type: "password", id: "deletePassword", autocomplete: "current-password", required: true });
+
+    modal({
+        title: "Delete your account?",
+        size: "sm",
+        danger: true,
+        submitLabel: "Delete forever",
+        busyLabel: "Deleting…",
+        body: h("div", { class: "stack" },
+            h("p", {}, "This permanently deletes your account and everything in it: every book, note, review, quote, reading goal and uploaded cover. It can't be undone."),
+            h("div", { class: "field" },
+                h("label", { for: "deletePassword" }, "Enter your password to confirm"),
+                password)
+        ),
+        async onSubmit({ setError }) {
+            if (!password.value) {
+                setError("Enter your password to confirm.");
+                password.focus();
+                return false;
+            }
+            await api.deleteAccount(password.value);
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            sessionStorage.setItem("authNotice", "Your account and all your books have been deleted.");
+            location.replace("/login.html");
+            return false; // keep the dialog up while the page changes
+        }
+    });
+});
 
 // ---------- Boot ----------
 

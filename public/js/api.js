@@ -124,6 +124,9 @@ export const api = {
     resetPassword: (token, password) =>
         request("/api/auth/reset-password", { method: "POST", body: { token, password }, auth: false }),
 
+    deleteAccount: (password) =>
+        request("/api/auth/account", { method: "DELETE", body: { password } }),
+
     async getBooks() {
         return (await request("/api/books")).data.map(normalizeBook);
     },
