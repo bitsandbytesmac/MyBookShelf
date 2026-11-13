@@ -87,7 +87,12 @@ app.use("/api", (req, res) => {
 
 // Central error handler (must come after all routes)
 app.use((err, req, res, next) => {
-    console.error(err);
+    // Upload problems (too big, wrong type) are the user's to fix, not server errors.
+    if (err.name === "MulterError") {
+        const message = err.code === "LIMIT_FILE_SIZE" ? "That image is too large (max 4 MB)." : "That upload couldn't be read.";
+        return res.status(400).json({ status: "error", message });
+    }
+    if (err.status !== 400) console.error(err);
     const status = err.status || 500;
     res.status(status).json({
         status: "error",

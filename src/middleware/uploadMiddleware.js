@@ -1,4 +1,5 @@
 import multer from "multer";
+import { MAX_COVER_BYTES } from "../services/coverStorage.js";
 
 // Store uploaded images temporarily in memory
 const storage = multer.memoryStorage();
@@ -15,7 +16,9 @@ function fileFilter(req, file, callback) {
     if (allowedTypes.includes(file.mimetype)) {
         callback(null, true);
     } else {
-        callback(new Error("Only JPG, PNG, and WEBP images are allowed."));
+        const error = new Error("Only JPG, PNG, and WEBP images are allowed.");
+        error.status = 400;
+        callback(error);
     }
 }
 
@@ -24,7 +27,8 @@ const upload = multer({
     storage: storage,
     fileFilter: fileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024
+        fileSize: MAX_COVER_BYTES,
+        files: 1
     }
 });
 

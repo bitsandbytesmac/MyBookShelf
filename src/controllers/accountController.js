@@ -1,33 +1,7 @@
 import bcrypt from "bcryptjs";
 import pool from "../config/db.js";
-import cloudinary from "../config/cloudinary.js";
 import { clearSessionCookie } from "../utils/session.js";
-
-const COVER_FOLDER = "mybookshelf/covers/";
-
-// Turn a Cloudinary URL we uploaded into its public_id, e.g.
-// https://res.cloudinary.com/<cloud>/image/upload/v123/mybookshelf/covers/abc.jpg -> mybookshelf/covers/abc
-// Anything else (Google Books covers, other clouds) returns null and is left alone.
-export function coverPublicId(url) {
-    try {
-        const { hostname, pathname } = new URL(url);
-        const cloud = process.env.CLOUDINARY_CLOUD_NAME;
-        if (hostname !== "res.cloudinary.com" || !cloud || !pathname.startsWith(`/${cloud}/image/upload/`)) return null;
-        const start = pathname.indexOf(`/${COVER_FOLDER}`);
-        if (start === -1) return null;
-        return decodeURIComponent(pathname.slice(start + 1)).replace(/\.[a-z0-9]+$/i, "");
-    } catch {
-        return null;
-    }
-}
-
-async function deleteCovers(urls) {
-    const ids = [...new Set(urls.map(coverPublicId).filter(Boolean))];
-    for (let i = 0; i < ids.length; i += 100) {
-        await cloudinary.api.delete_resources(ids.slice(i, i + 100));
-    }
-    return ids.length;
-}
+import { deleteAllCoversForUser } from "../services/coverStorage.js";
 
 // DELETE /api/auth/account  { password }
 // Permanently removes the signed-in user, their books, activity, reset links and uploaded covers.
@@ -40,7 +14,6 @@ export async function deleteAccount(req, res) {
 
     const userId = req.user.id;
     let client;
-    let coverUrls = [];
 
     try {
         client = await pool.connect();
@@ -57,12 +30,6 @@ export async function deleteAccount(req, res) {
             await client.query("ROLLBACK");
             return res.status(400).json({ message: "That password isn't right.", status: "error" });
         }
-
-        const covers = await client.query(
-            "SELECT cover_url FROM books WHERE user_id = $1 AND cover_url IS NOT NULL",
-            [userId]
-        );
-        coverUrls = covers.rows.map((row) => row.cover_url);
 
         // Foreign keys cascade, but delete explicitly so this never depends on them.
         await client.query("DELETE FROM reading_activities WHERE user_id = $1", [userId]);
@@ -81,7 +48,7 @@ export async function deleteAccount(req, res) {
 
     // The account is gone either way; a leftover image shouldn't fail the request.
     try {
-        await deleteCovers(coverUrls);
+        await deleteAllCoversForUser(userId);
     } catch (error) {
         console.error("Account deleted, but removing cover images failed:", error);
     }

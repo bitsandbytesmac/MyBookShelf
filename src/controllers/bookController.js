@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { deleteUnusedCovers } from "../services/coverStorage.js";
 
 export const BOOK_STATUSES = ["To Be Read", "Reading", "Read", "DNF", "Paused"];
 export const BOOK_FORMATS = ["Paperback", "Hardbound", "E-book", "Audiobook"];
@@ -172,7 +173,7 @@ export async function updateBook(req, res) {
         await client.query("BEGIN");
 
         const existing = await client.query(
-            "SELECT current_page FROM books WHERE id = $1 AND user_id = $2 FOR UPDATE",
+            "SELECT current_page, cover_url FROM books WHERE id = $1 AND user_id = $2 FOR UPDATE",
             [req.params.id, req.user.id]
         );
 
@@ -202,6 +203,11 @@ export async function updateBook(req, res) {
         }
 
         await client.query("COMMIT");
+
+        // Cover replaced or removed: delete the old image file (only ever this user's own uploads).
+        const oldCover = existing.rows[0].cover_url;
+        if (oldCover && oldCover !== values.cover_url) await deleteUnusedCovers([oldCover], req.user.id);
+
         res.json({ message: "Book updated successfully!", status: "success", data: updated.rows[0] });
     } catch (err) {
         if (client) await client.query("ROLLBACK").catch(() => {});
@@ -216,13 +222,16 @@ export async function updateBook(req, res) {
 export async function deleteBook(req, res) {
     try {
         const deleted = await pool.query(
-            "DELETE FROM books WHERE id = $1 AND user_id = $2 RETURNING id",
+            "DELETE FROM books WHERE id = $1 AND user_id = $2 RETURNING id, cover_url",
             [req.params.id, req.user.id]
         );
 
         if (deleted.rows.length === 0) return sendError(res, 404, "Book not found.");
 
-        res.json({ message: "Book deleted successfully!", status: "success", data: deleted.rows[0] });
+        const { cover_url: cover, ...data } = deleted.rows[0];
+        await deleteUnusedCovers([cover], req.user.id);
+
+        res.json({ message: "Book deleted successfully!", status: "success", data });
     } catch (error) {
         console.error("Error deleting book:", error);
         sendError(res, 500, "Failed to delete book.");

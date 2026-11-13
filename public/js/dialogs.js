@@ -6,7 +6,34 @@ import {
 } from "./store.js";
 import { h, icon, cover, progressBar, rateInput, multiSelect, modal, toast, stripHtml, fmt } from "./ui.js";
 
-const MAX_COVER_BYTES = 5 * 1024 * 1024;
+const MAX_PICK_BYTES = 20 * 1024 * 1024;  // what you can choose (it gets shrunk before upload)
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // what the server accepts
+const COVER_MAX_W = 600;
+const COVER_MAX_H = 900;
+
+// Resize to at most 600×900 and re-encode as WebP (JPEG if the browser can't), so covers are
+// typically 30–150 KB. Falls back to the original file if anything goes wrong.
+async function shrinkCover(file) {
+    try {
+        const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+        const scale = Math.min(1, COVER_MAX_W / bitmap.width, COVER_MAX_H / bitmap.height);
+        const width = Math.max(1, Math.round(bitmap.width * scale));
+        const height = Math.max(1, Math.round(bitmap.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(bitmap, 0, 0, width, height);
+        bitmap.close?.();
+
+        const encode = (type) => new Promise((resolve) => canvas.toBlob(resolve, type, 0.85));
+        let blob = await encode("image/webp");
+        if (!blob || blob.type !== "image/webp") blob = await encode("image/jpeg");
+        if (!blob || (scale === 1 && blob.size >= file.size)) return file;
+        return new File([blob], `cover.${blob.type === "image/webp" ? "webp" : "jpg"}`, { type: blob.type });
+    } catch {
+        return file;
+    }
+}
 
 const sameBook = (a, b) =>
     a.title.trim().toLowerCase() === b.title.trim().toLowerCase() &&
@@ -77,8 +104,8 @@ function coverPicker(book) {
             fileInput.value = "";
             return;
         }
-        if (file.size > MAX_COVER_BYTES) {
-            toast("That image is over 5 MB.", { error: true });
+        if (file.size > MAX_PICK_BYTES) {
+            toast("That image is over 20 MB.", { error: true });
             fileInput.value = "";
             return;
         }
@@ -96,12 +123,15 @@ function coverPicker(book) {
             h("div", { class: "cover-actions" },
                 h("label", { class: "btn btn-sm", for: fileInput.id }, book.coverUrl ? "Change cover" : "Upload cover"),
                 fileInput,
-                h("span", { class: "hint" }, "JPG, PNG or WEBP, up to 5 MB")
+                h("span", { class: "hint" }, "JPG, PNG or WEBP, up to 20 MB (resized automatically)")
             )
         ),
         // Uploads the chosen file (if any) and returns the cover URL to save.
         async resolve() {
-            return pendingFile ? api.uploadCover(pendingFile) : book.coverUrl || null;
+            if (!pendingFile) return book.coverUrl || null;
+            const small = await shrinkCover(pendingFile);
+            if (small.size > MAX_UPLOAD_BYTES) throw new Error("That image is too large to upload. Try a smaller one.");
+            return api.uploadCover(small);
         }
     };
 }
