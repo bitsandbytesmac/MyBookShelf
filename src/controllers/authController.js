@@ -13,7 +13,10 @@ export function logoutUser(req, res) {
 // Register a new user
 export async function registerUser(req, res) {
     try {
-        const { username, email, password } = req.body;
+        const username = typeof req.body?.username === "string" ? req.body.username.trim() : "";
+        // Emails are stored lower-case so "Ana@x.com" and "ana@x.com" are the same account.
+        const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+        const password = typeof req.body?.password === "string" ? req.body.password : "";
 
         // Check required fields
         if (!username || !email || !password) {
@@ -21,6 +24,17 @@ export async function registerUser(req, res) {
                 message: "Please provide username, email, and password.",
                 status: "error"
             });
+        }
+        if (password.length < 8 || password.length > 200) {
+            return res.status(400).json({ message: "Password must be 8 to 200 characters.", status: "error" });
+        }
+        if (username.length > 100 || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({ message: "Please enter a valid name and email address.", status: "error" });
+        }
+
+        const existing = await pool.query("SELECT 1 FROM users WHERE LOWER(email) = $1 LIMIT 1", [email]);
+        if (existing.rows.length) {
+            return res.status(409).json({ message: "Email already exists. Please use another email.", status: "error" });
         }
 
         // Hash the password
@@ -79,7 +93,8 @@ export async function registerUser(req, res) {
 // Login an existing user
 export async function loginUser(req, res) {
     try {
-        const { email, password } = req.body;
+        const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+        const password = typeof req.body?.password === "string" ? req.body.password : "";
 
         // Check required fields
         if (!email || !password) {
@@ -91,7 +106,8 @@ export async function loginUser(req, res) {
 
         // Find user by email
         const result = await pool.query(
-            "SELECT * FROM users WHERE email = $1",
+            // Case-insensitive: phones often capitalise the first letter of the email.
+            "SELECT * FROM users WHERE LOWER(email) = LOWER($1) ORDER BY id LIMIT 1",
             [email]
         );
 
