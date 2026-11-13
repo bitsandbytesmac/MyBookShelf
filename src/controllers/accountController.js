@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import pool from "../config/db.js";
 import cloudinary from "../config/cloudinary.js";
+import { clearSessionCookie } from "../utils/session.js";
 
 const COVER_FOLDER = "mybookshelf/covers/";
 
@@ -85,5 +86,6 @@ export async function deleteAccount(req, res) {
         console.error("Account deleted, but removing cover images failed:", error);
     }
 
+    clearSessionCookie(res);
     res.json({ message: "Your account and everything in it has been deleted.", status: "success" });
 }

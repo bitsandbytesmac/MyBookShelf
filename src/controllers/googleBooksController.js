@@ -3,7 +3,7 @@ export async function searchGoogleBooks(req, res) {
     try {
         const { q } = req.query;
 
-        if (!q || !q.trim()) {
+        if (typeof q !== "string" || !q.trim() || q.length > 200) {
             return res.status(400).json({
                 message: "Please provide a book title or author.",
                 status: "error"

@@ -1,5 +1,5 @@
-import { state, percent, STATUSES, FORMATS } from "./store.js";
-import { h, icon, cover, progressBar, statusBadge, stars, fmt } from "./ui.js";
+import { state, percent, STATUSES, FORMATS, bySeriesOrder } from "./store.js";
+import { h, icon, cover, progressBar, statusBadge, stars, fmt, seriesLabel } from "./ui.js";
 import { openAddBook } from "./dialogs.js";
 import { loadingSkeleton } from "./dashboard.js";
 
@@ -8,7 +8,8 @@ const SORTS = {
     title: { label: "Title A–Z", fn: (a, b) => a.title.localeCompare(b.title) },
     author: { label: "Author A–Z", fn: (a, b) => a.author.localeCompare(b.author) },
     progress: { label: "Progress", fn: (a, b) => percent(b) - percent(a) },
-    rating: { label: "Rating", fn: (a, b) => (b.rating || 0) - (a.rating || 0) }
+    rating: { label: "Rating", fn: (a, b) => (b.rating || 0) - (a.rating || 0) },
+    series: { label: "Series order", fn: (a, b) => (a.series ? 0 : 1) - (b.series ? 0 : 1) || (a.series || "").localeCompare(b.series || "") || bySeriesOrder(a, b) }
 };
 
 const filters = { query: "", status: "All", genre: "All", format: "All", sort: "recent" };
@@ -70,7 +71,7 @@ export function renderLibrary(params) {
         h("div", { class: "toolbar" },
             h("div", { class: "search" }, icon("search"),
                 h("input", {
-                    class: "input", type: "search", placeholder: "Search title or author", value: filters.query, "aria-label": "Search library",
+                    class: "input", type: "search", placeholder: "Search title, author or series", value: filters.query, "aria-label": "Search library",
                     oninput: (e) => {
                         filters.query = e.target.value;
                         update();
@@ -95,7 +96,7 @@ function renderResults() {
 
     const q = filters.query.trim().toLowerCase();
     const list = state.books.filter((b) => {
-        if (q && !b.title.toLowerCase().includes(q) && !b.author.toLowerCase().includes(q)) return false;
+        if (q && ![b.title, b.author, b.series].some((v) => (v || "").toLowerCase().includes(q))) return false;
         if (filters.genre !== "All" && !b.genres.includes(filters.genre) && !b.subgenres.includes(filters.genre)) return false;
         if (filters.format !== "All" && b.format !== filters.format) return false;
         if (filters.status === "Favorites") return b.isFavorite;
@@ -123,6 +124,7 @@ export function bookTile(book) {
         h("div", {},
             h("h3", {}, book.title),
             h("p", { class: "author" }, book.author),
+            book.series ? h("p", { class: "tile-series" }, seriesLabel(book).replace(" · Book ", " #")) : null,
             h("div", { class: "tile-meta" }, statusBadge(book.status)),
             ["Reading", "Paused"].includes(book.status) && book.totalPages
                 ? h("div", { class: "tile-meta" }, progressBar(pct, { thin: true }), h("small", {}, `${pct}%`))

@@ -1,6 +1,6 @@
 // Single book page: details, reading sessions, notes, and review.
-import { state, getBook, updateBook, deleteBook, percent, STATUSES } from "./store.js";
-import { h, icon, cover, progressBar, statusBadge, stars, chilis, fmt, toast, confirmDialog } from "./ui.js";
+import { state, getBook, updateBook, deleteBook, percent, STATUSES, authorNames } from "./store.js";
+import { h, icon, cover, progressBar, statusBadge, stars, chilis, fmt, toast, confirmDialog, authorHref, seriesHref, seriesLabel } from "./ui.js";
 import { openEditBook, openReview } from "./dialogs.js";
 import { loadingSkeleton } from "./dashboard.js";
 
@@ -67,7 +67,8 @@ function hero(book) {
         cover(book, "lg"),
         h("div", { style: { minWidth: 0, width: "100%" } },
             h("h1", {}, book.title),
-            h("p", { class: "by" }, `by ${book.author}`),
+            h("p", { class: "by" }, "by ", authorNames(book).flatMap((name, i) => [i ? ", " : null, h("a", { href: authorHref(name) }, name)])),
+            book.series ? h("a", { class: "series-link", href: seriesHref(book.series) }, icon("layers"), seriesLabel(book)) : null,
             h("div", { class: "badge-row" },
                 statusBadge(book.status),
                 book.format ? h("span", { class: "badge meta" }, book.format) : null,
@@ -208,6 +209,7 @@ function detailsCard(book) {
         ),
         h("dl", { class: "detail-list" },
             row("Book status", book.status),
+            row("Series", book.series ? h("a", { href: seriesHref(book.series) }, seriesLabel(book)) : ""),
             row("Format", book.format),
             row("Status", book.ownership),
             row("Pages", book.totalPages ? fmt.num(book.totalPages) : ""),

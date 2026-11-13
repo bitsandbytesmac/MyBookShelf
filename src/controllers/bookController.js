@@ -46,6 +46,16 @@ function optionalDate(value, label) {
     return { value };
 }
 
+// Position in a series: positive, up to 2 decimals (1.5 for a novella between books 1 and 2).
+function seriesNumber(value) {
+    if (value === undefined || value === null || value === "") return { value: null };
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0 || n > 9999 || Math.abs(Math.round(n * 100) - n * 100) > 1e-6) {
+        return { error: "Series number must be a positive number like 1, 2 or 1.5." };
+    }
+    return { value: n };
+}
+
 function pageNumber(value, label) {
     if (value === undefined || value === null || value === "") return { value: 0 };
     const n = Number(value);
@@ -61,6 +71,8 @@ function parseBook(body = {}) {
         author: optionalText(body.author, LIMITS.text, "Author"),
         summary: optionalText(body.summary, LIMITS.summary, "Summary"),
         cover_url: optionalText(body.coverUrl, 2000, "Cover URL"),
+        series: optionalText(body.series, 200, "Series"),
+        series_number: seriesNumber(body.seriesNumber),
         genres: stringList(body.genres, LIMITS.tags, LIMITS.tag, "Genres"),
         subgenres: stringList(body.subgenres, LIMITS.tags, LIMITS.tag, "Sub-genres"),
         format: optionalChoice(body.format, BOOK_FORMATS, "Format"),
@@ -84,6 +96,7 @@ function parseBook(body = {}) {
 
     if (!values.title) return { error: "Please provide a title." };
     if (!values.author) return { error: "Please provide an author." };
+    if (values.series_number !== null && !values.series) return { error: "Add the series name for this book number." };
 
     if (values.total_pages > 0 && values.current_page > values.total_pages) {
         return { error: "Current page cannot exceed total pages." };
@@ -100,7 +113,7 @@ function parseBook(body = {}) {
 }
 
 const COLUMNS = [
-    "title", "author", "summary", "cover_url", "genres", "subgenres", "format", "ownership", "status",
+    "title", "author", "summary", "cover_url", "series", "series_number", "genres", "subgenres", "format", "ownership", "status",
     "total_pages", "current_page", "rating", "spice", "quotes", "review", "personal_notes",
     "date_started", "date_finished", "is_favorite", "genre", "completed_at"
 ];

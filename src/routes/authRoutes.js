@@ -1,5 +1,5 @@
 import express from "express";
-import { registerUser, loginUser } from "../controllers/authController.js";
+import { registerUser, loginUser, logoutUser } from "../controllers/authController.js";
 import { requestPasswordReset, resetPassword } from "../controllers/passwordResetController.js";
 import { deleteAccount } from "../controllers/accountController.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
@@ -11,6 +11,9 @@ router.post("/register", registerUser);
 
 // Login an existing user
 router.post("/login", loginUser);
+
+// Clear the session cookie
+router.post("/logout", logoutUser);
 
 // Email a password reset link
 router.post("/forgot-password", requestPasswordReset);

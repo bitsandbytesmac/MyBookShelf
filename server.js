@@ -8,14 +8,35 @@ import uploadRoutes from "./src/routes/uploadRoutes.js";
 import activityRoutes from "./src/routes/activityRoutes.js";
 import goalRoutes from "./src/routes/goalRoutes.js";
 import themeRoutes from "./src/routes/themeRoutes.js";
+import { sameOriginOnly } from "./src/utils/session.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Force HTTPS in production. Vercel handles TLS and tells us the original scheme in x-forwarded-proto.
+// (Static pages get the same headers from vercel.json.)
+app.disable("x-powered-by");
+app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+
+    if (process.env.NODE_ENV === "production") {
+        if (req.headers["x-forwarded-proto"] === "http") {
+            return res.redirect(308, `https://${req.headers.host}${req.originalUrl}`);
+        }
+        // Tell browsers to only ever use HTTPS for this site (2 years).
+        res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
+    }
+    next();
+});
+
 // Middleware
 app.use(express.json());
+
+// Logins live in a cookie now, so refuse change requests that come from other websites.
+app.use("/api", sameOriginOnly);
 
 // Serve frontend files
 app.use(express.static('public'));

@@ -1,16 +1,17 @@
 import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
+import { readSessionToken, clearSessionCookie } from "../utils/session.js";
 
 function deny(res, message = "Invalid or expired token.") {
+    clearSessionCookie(res);
     return res.status(401).json({ message, status: "error" });
 }
 
-// Verify the login token, and that it hasn't been revoked by a password reset.
+// Verify the session cookie, and that it hasn't been revoked by a password reset.
 export async function authenticateToken(req, res, next) {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(" ")[1];
+    const token = readSessionToken(req);
 
-    if (!token) return deny(res, "Access denied. No token provided.");
+    if (!token) return res.status(401).json({ message: "Access denied. No token provided.", status: "error" });
 
     let decoded;
     try {

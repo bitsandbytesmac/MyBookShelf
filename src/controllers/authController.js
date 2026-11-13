@@ -2,6 +2,13 @@ import pool from "../config/db.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { cleanTheme } from "./themeController.js";
+import { setSessionCookie, clearSessionCookie } from "../utils/session.js";
+
+// Log out on this device: drop the session cookie.
+export function logoutUser(req, res) {
+    clearSessionCookie(res);
+    res.json({ message: "Logged out.", status: "success" });
+}
 
 // Register a new user
 export async function registerUser(req, res) {
@@ -123,6 +130,9 @@ export async function loginUser(req, res) {
             }
         );
 
+        // The token goes in an HttpOnly cookie, never in the response body.
+        setSessionCookie(res, token);
+
         res.json({
             message: "Login successful!",
             status: "success",
@@ -130,8 +140,7 @@ export async function loginUser(req, res) {
                 id: user.id,
                 username: user.username,
                 email: user.email,
-                theme: cleanTheme(user.theme),  // so the app opens in the user's look straight away
-                token
+                theme: cleanTheme(user.theme)  // so the app opens in the user's look straight away
             }
         });
 

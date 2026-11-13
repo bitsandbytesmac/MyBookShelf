@@ -148,8 +148,10 @@ export function openCustomize() {
 
         warning.textContent = "";
         if (draft.background) {
-            const text = toHex(getComputedStyle(document.documentElement).getPropertyValue("--text"));
-            if (text && contrast(draft.background, text) < 4.5) {
+            // Check the page's main and secondary text colours (headings and subtitles sit on the background).
+            const style = getComputedStyle(document.documentElement);
+            const texts = ["--text", "--text-2"].map((name) => toHex(style.getPropertyValue(name))).filter(Boolean);
+            if (texts.some((text) => contrast(draft.background, text) < 4.5)) {
                 warning.textContent = "Headings may be hard to read on this colour. Try a lighter one, or the Night theme for dark backgrounds.";
             }
         }

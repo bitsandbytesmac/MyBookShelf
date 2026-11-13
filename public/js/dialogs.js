@@ -1,7 +1,7 @@
 // Add book (Google Books search or manual), Edit details, and Review dialogs.
 import { api } from "./api.js";
 import {
-    state, createBook, updateBook, genreOptions, percent,
+    state, createBook, updateBook, genreOptions, percent, seriesNames,
     STATUSES, FORMATS, OWNERSHIP, GENRES
 } from "./store.js";
 import { h, icon, cover, progressBar, rateInput, multiSelect, modal, toast, stripHtml, fmt } from "./ui.js";
@@ -24,6 +24,39 @@ function selectField(id, label, options, value, { blank } = {}) {
 
 function textField(id, label, value = "", attrs = {}) {
     return h("div", { class: "field" }, h("label", { for: id }, label), h("input", { class: "input", id, value, autocomplete: "off", ...attrs }));
+}
+
+// Reuse the existing spelling of a series ("acotar" typed vs "ACOTAR" saved) so books group together.
+function matchSeriesName(name) {
+    const clean = (name || "").trim().replace(/\s+/g, " ");
+    if (!clean) return "";
+    return seriesNames().find((n) => n.toLowerCase() === clean.toLowerCase()) || clean;
+}
+
+// Series name (suggests the user's existing series) + number in series.
+function seriesFields(book, prefix) {
+    const listId = `${prefix}SeriesOptions`;
+    return h("div", { class: "field-row series-fields" },
+        h("div", { class: "field" },
+            h("label", { for: `${prefix}Series` }, "Series"),
+            h("input", { class: "input", id: `${prefix}Series`, value: book.series || "", list: listId, autocomplete: "off", maxlength: 200, placeholder: "Leave blank if it's a standalone" }),
+            h("datalist", { id: listId }, seriesNames().map((n) => h("option", { value: n })))
+        ),
+        h("div", { class: "field" },
+            h("label", { for: `${prefix}SeriesNo` }, "Book #"),
+            h("input", { class: "input", id: `${prefix}SeriesNo`, type: "number", min: 0, step: "any", inputmode: "decimal", value: book.seriesNumber ?? "", placeholder: "1" })
+        )
+    );
+}
+
+// Reads + validates the series fields. Returns { series, seriesNumber } or { error }.
+function readSeries(body, prefix) {
+    const series = matchSeriesName(body.querySelector(`#${prefix}Series`).value);
+    const raw = body.querySelector(`#${prefix}SeriesNo`).value.trim();
+    const seriesNumber = raw === "" ? null : Number(raw);
+    if (seriesNumber !== null && (!Number.isFinite(seriesNumber) || seriesNumber <= 0)) return { error: "Book # must be a positive number, like 1, 2 or 1.5." };
+    if (seriesNumber !== null && !series) return { error: "Add the series name, or clear the book number." };
+    return { series, seriesNumber: series ? seriesNumber : null };
 }
 
 // ---------- Cover picker (shared by manual add + edit) ----------
@@ -86,13 +119,24 @@ function genresFromCategories(categories = []) {
     return parts.length ? [parts[0]] : [];
 }
 
+// "A Court of Mist and Fury (A Court of Thorns and Roses, Book 2)" or "Catching Fire (The Hunger Games #2)"
+// -> title without the bracket, plus the series name and number.
+export function splitSeriesFromTitle(rawTitle = "") {
+    const m = rawTitle.match(/^(.*\S)\s*\(([^()]+?)[,\s]\s*(?:Book|Bk\.?|Vol\.?|Volume|#)\s*(\d+(?:\.\d+)?)\)\s*$/i);
+    if (!m) return { title: rawTitle, series: "", seriesNumber: null };
+    return { title: m[1], series: m[2].replace(/[,\s]+$/, "").trim(), seriesNumber: Number(m[3]) };
+}
+
 function fromGoogle(item) {
     const info = item.volumeInfo || {};
     const thumb = (info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || "")
         .replace(/^http:/, "https:")
         .replace("&edge=curl", "");
+    const { title, series, seriesNumber } = splitSeriesFromTitle(info.title || "Untitled");
     return {
-        title: info.subtitle ? `${info.title}: ${info.subtitle}` : info.title || "Untitled",
+        title: info.subtitle ? `${title}: ${info.subtitle}` : title,
+        series: matchSeriesName(series),
+        seriesNumber: series ? seriesNumber : null,
         author: info.authors?.join(", ") || "Unknown author",
         coverUrl: thumb || null,
         summary: stripHtml(info.description || ""),
@@ -163,6 +207,7 @@ export function openAddBook() {
             h("div", {},
                 h("strong", {}, data.title),
                 h("span", { class: "meta" }, [data.author, data.year, data.totalPages ? `${data.totalPages} pages` : null].filter(Boolean).join(" · ")),
+                data.series ? h("span", { class: "meta" }, `${data.series}${data.seriesNumber ? ` #${data.seriesNumber}` : ""}`) : null,
                 data.summary ? h("p", { class: "blurb" }, data.summary) : null
             ),
             addBtn
@@ -199,6 +244,7 @@ function openManualAdd(prefillTitle = "") {
         picker.el,
         textField("mTitle", "Title", prefillTitle, { required: true }),
         textField("mAuthor", "Author", "", { required: true }),
+        seriesFields({}, "m"),
         h("div", { class: "field" }, h("label", { for: "mSummary" }, "Summary"),
             h("textarea", { class: "textarea", id: "mSummary", rows: 4, placeholder: "What's it about?" })),
         textField("mPages", "Total pages", "", { type: "number", min: 0, inputmode: "numeric" })
@@ -216,9 +262,12 @@ function openManualAdd(prefillTitle = "") {
             if (!author) return setError("Add an author."), false;
             if (!Number.isInteger(pages) || pages < 0) return setError("Total pages must be a whole number."), false;
             if (state.books.some((b) => sameBook(b, { title, author }))) return setError("That book is already on your shelf."), false;
+            const series = readSeries(body, "m");
+            if (series.error) return setError(series.error), false;
 
             await addAndOpen({
                 title, author,
+                series: series.series, seriesNumber: series.seriesNumber,
                 summary: body.querySelector("#mSummary").value.trim(),
                 totalPages: pages,
                 coverUrl: await picker.resolve()
@@ -251,6 +300,7 @@ export function openEditBook(book) {
         picker.el,
         textField("eTitle", "Title", book.title),
         textField("eAuthor", "Author", book.author),
+        seriesFields(book, "e"),
         h("div", { class: "field" }, h("label", { for: "eSummary" }, "Summary"),
             h("textarea", { class: "textarea", id: "eSummary", rows: 5 }, book.summary)),
         h("div", { class: "field-row-3" },
@@ -283,9 +333,12 @@ export function openEditBook(book) {
             if (!Number.isInteger(currentPage) || currentPage < 0) return setError("Current page must be a whole number."), false;
             if (totalPages > 0 && currentPage > totalPages) return setError("The page you're on can't be past the last page."), false;
             if (!totalPages && currentPage) return setError("Add total pages to track progress."), false;
+            const series = readSeries(body, "e");
+            if (series.error) return setError(series.error), false;
 
             await updateBook(book.id, {
                 title, author,
+                series: series.series, seriesNumber: series.seriesNumber,
                 summary: body.querySelector("#eSummary").value.trim(),
                 status: body.querySelector("#eStatus").value,
                 format: body.querySelector("#eFormat").value,

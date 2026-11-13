@@ -4,6 +4,8 @@ import { loadAll, subscribe } from "./store.js";
 import { renderDashboard, currentUser } from "./dashboard.js";
 import { renderLibrary } from "./library.js";
 import { renderBookPage } from "./bookPage.js";
+import { renderAuthors, renderAuthor } from "./authors.js";
+import { renderSeries } from "./series.js";
 import { openAddBook } from "./dialogs.js";
 import { h, modal, toast } from "./ui.js";
 import { openCustomize, syncTheme } from "./theme.js";
@@ -13,7 +15,10 @@ const view = document.getElementById("view");
 const ROUTES = {
     dashboard: { render: renderDashboard, title: () => "Dashboard", tab: "dashboard" },
     library: { render: renderLibrary, title: () => "Library", tab: "library" },
-    book: { render: renderBookPage, title: () => document.querySelector(".book-hero h1")?.textContent || "Book", tab: "library" }
+    book: { render: renderBookPage, title: () => document.querySelector(".book-hero h1")?.textContent || "Book", tab: "library" },
+    authors: { render: renderAuthors, title: () => "Authors", tab: "authors" },
+    author: { render: renderAuthor, title: () => document.querySelector(".author-hero h1")?.textContent || "Author", tab: "authors" },
+    series: { render: renderSeries, title: () => document.querySelector(".series-hero h1")?.textContent || "Series", tab: "series" }
 };
 
 let currentKey = null;
@@ -131,7 +136,6 @@ document.getElementById("deleteAccountBtn").addEventListener("click", () => {
                 return false;
             }
             await api.deleteAccount(password.value);
-            localStorage.removeItem("token");
             localStorage.removeItem("user");
             localStorage.removeItem("theme");
             sessionStorage.setItem("authNotice", "Your account and all your books have been deleted.");

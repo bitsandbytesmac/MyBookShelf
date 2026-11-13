@@ -72,17 +72,8 @@ export function renderDashboard() {
         tile("tile-read", "Completed", byStatus("Read").length, "books finished", "#/library?status=Read", "check")
     );
 
-    // Currently reading list
-    const readingSection = h("section", { class: "section" },
-        h("div", { class: "section-head" },
-            h("h2", {}, "Currently reading"),
-            reading.length > 4 ? h("a", { href: "#/library?status=Reading" }, "See all") : null
-        ),
-        reading.length
-            ? h("div", { class: "reading-list" }, reading.slice(0, 4).map(readingCard))
-            : h("div", { class: "card empty-sm" }, "Nothing in progress. ",
-                h("a", { href: "#/library?status=To%20Be%20Read" }, "Pick your next read from your TBR"), ".")
-    );
+    // Book Shelf: every finished book, standing on wooden shelves (newest first).
+    const shelfSection = bookShelf(byStatus("Read"));
 
     // 5–6. Goals + books read per month
     const goalsGrid = h("div", { class: "dash-grid section" }, goalsCard(), monthlyCard());
@@ -94,21 +85,39 @@ export function renderDashboard() {
     );
 
     // 7. Quotes
-    return h("div", {}, head, tiles, readingSection, goalsGrid, statsGrid, quotesSection());
+    return h("div", {}, head, tiles, shelfSection, goalsGrid, statsGrid, quotesSection());
 }
 
-function readingCard(book) {
-    const pct = percent(book);
-    return h("article", { class: "card reading-item", tabindex: 0, onclick: () => openBook(book.id), onkeydown: (e) => e.key === "Enter" && openBook(book.id) },
-        cover(book, "sm"),
-        h("div", { class: "reading-body" },
-            h("h3", {}, book.title),
-            h("span", { class: "author" }, book.author),
-            h("div", { class: "reading-meta" },
-                h("span", {}, book.totalPages ? `Page ${fmt.num(book.currentPage)} of ${fmt.num(book.totalPages)}` : "No page count yet"),
-                h("strong", {}, `${pct}%`)
+const SHELF_LIMIT = 36;
+
+function bookShelf(finished) {
+    // Newest finish first; books without a finish date go after, newest added first.
+    const books = [...finished].sort((a, b) =>
+        (b.dateFinished || "").localeCompare(a.dateFinished || "") || Number(b.id) - Number(a.id));
+    const shown = books.slice(0, SHELF_LIMIT);
+
+    const spine = (book) => {
+        const label = [book.title, book.author, book.dateFinished ? `finished ${fmt.date(book.dateFinished)}` : null].filter(Boolean).join(" · ");
+        const node = h("a", { class: "shelf-book", href: `#/book/${book.id}`, "aria-label": label, title: label }, cover(book, "sm"));
+        if (book.rating === 5) node.append(h("span", { class: "shelf-fav", "aria-hidden": "true" }, "★"));
+        return node;
+    };
+
+    return h("section", { class: "section" },
+        h("div", { class: "section-head" },
+            h("div", {},
+                h("h2", {}, "Book Shelf"),
+                h("p", { class: "section-sub" }, books.length
+                    ? `${fmt.plural(books.length, "book")} finished${books.length > SHELF_LIMIT ? ` · showing your latest ${SHELF_LIMIT}` : ""}`
+                    : "Every book you finish lands here")
             ),
-            progressBar(pct)
+            books.length ? h("a", { href: "#/library?status=Read" }, "See all") : null
+        ),
+        h("div", { class: `bookcase${books.length ? "" : " is-empty"}` },
+            books.length
+                ? h("div", { class: "shelf", role: "list" }, shown.map((b) => h("div", { role: "listitem", class: "shelf-slot" }, spine(b))))
+                : h("div", { class: "shelf shelf-empty" },
+                    h("p", {}, "Your shelf is waiting. Finish a book and it'll stand right here."))
         )
     );
 }

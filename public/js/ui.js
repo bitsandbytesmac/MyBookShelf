@@ -34,6 +34,9 @@ const ICONS = {
     book: '<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>',
     bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
+    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+    layers: '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
     palette: '<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a6 6 0 0 0 6-6c0-4.4-4.5-8.6-10-8.6z"/>',
     pen: '<path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>'
 };
@@ -48,7 +51,8 @@ export function icon(name, { filled = false, cls } = {}) {
 
 // ---------- Book bits ----------
 
-const FALLBACK_COLORS = ["#c78f8f", "#8ea66b", "#b98a7e", "#7f9a6a", "#c99a8a", "#a7845f", "#9c7b8e", "#6f8f72"];
+// Dark enough for white titles to pass WCAG AA (4.5:1).
+const FALLBACK_COLORS = ["#ae5e5e", "#687c4b", "#a06657", "#657b53", "#a7644d", "#8f6f4e", "#8e6a7f", "#617c63"];
 
 function hashString(text) {
     let hash = 0;
@@ -84,6 +88,44 @@ const STATUS_CLASS = { "To Be Read": "st-tbr", Reading: "st-reading", Read: "st-
 
 export function statusBadge(status) {
     return h("span", { class: `badge ${STATUS_CLASS[status] || ""}` }, status);
+}
+
+// ---------- Authors & series ----------
+
+export const authorHref = (name) => `#/author/${encodeURIComponent(name)}`;
+export const seriesHref = (name) => `#/series/${encodeURIComponent(name)}`;
+
+// "A Court of Thorns and Roses · Book 2"
+export function seriesLabel(book) {
+    if (!book.series) return "";
+    return book.seriesNumber ? `${book.series} · Book ${book.seriesNumber}` : book.series;
+}
+
+export function initials(name) {
+    const words = name.replace(/[^\p{L}\p{N}\s'-]/gu, "").trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return "?";
+    return (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase();
+}
+
+export function authorAvatar(name, size = "md") {
+    return h("span", {
+        class: `author-avatar author-avatar-${size}`, "aria-hidden": "true",
+        style: { background: FALLBACK_COLORS[hashString(name.toLowerCase()) % FALLBACK_COLORS.length] }
+    }, initials(name));
+}
+
+const SERIES_STATUS_CLASS = { Completed: "st-read", "In progress": "st-reading", "Not started": "st-tbr" };
+export function seriesBadge(status) {
+    return h("span", { class: `badge ${SERIES_STATUS_CLASS[status] || ""}` }, status);
+}
+
+// Overlapping covers, e.g. on author and series cards.
+export function coverStack(books, max = 4) {
+    const shown = books.slice(0, max);
+    return h("div", { class: "cover-stack", "aria-hidden": "true" },
+        shown.map((b) => cover(b, "xs")),
+        books.length > max ? h("span", { class: "cover-more" }, `+${books.length - max}`) : null
+    );
 }
 
 export function stars(rating) {

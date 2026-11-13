@@ -9,10 +9,15 @@ export class ApiError extends Error {
 
 let redirecting = false;
 
-export function logout(reason) {
+// The login token is an HttpOnly cookie the browser sends by itself; scripts never see it.
+// localStorage only keeps the user's name/email/theme for display.
+localStorage.removeItem("token"); // left over from before the cookie switch
+
+export async function logout(reason) {
     if (redirecting) return;
     redirecting = true;
-    localStorage.removeItem("token");
+    // Ask the server to drop the cookie. Don't let a network problem stop the logout.
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     localStorage.removeItem("user");
     if (reason) sessionStorage.setItem("authMessage", reason);
     location.replace("/login.html");
@@ -26,7 +31,6 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
         headers["Content-Type"] = "application/json";
         payload = JSON.stringify(body);
     }
-    if (auth) headers.Authorization = `Bearer ${localStorage.getItem("token")}`;
 
     let response;
     try {
@@ -67,6 +71,8 @@ export function normalizeBook(row) {
         author: row.author,
         summary: row.summary || "",
         coverUrl: row.cover_url || null,
+        series: row.series || "",
+        seriesNumber: row.series_number != null ? Number(row.series_number) : null, // NUMERIC arrives as a string
         genres,
         subgenres: Array.isArray(row.subgenres) ? row.subgenres : [],
         format: row.format || "",
@@ -93,6 +99,8 @@ function toPayload(book) {
         author: book.author,
         summary: book.summary || null,
         coverUrl: book.coverUrl || null,
+        series: book.series || null,
+        seriesNumber: book.series ? book.seriesNumber ?? null : null,
         genres: book.genres || [],
         subgenres: book.subgenres || [],
         format: book.format || null,
@@ -160,7 +168,7 @@ export const api = {
     },
 
     async searchGoogleBooks(query) {
-        return (await request(`/api/google-books/search?q=${encodeURIComponent(query)}`, { auth: false })).data;
+        return (await request(`/api/google-books/search?q=${encodeURIComponent(query)}`)).data;
     },
     async uploadCover(file) {
         const form = new FormData();
