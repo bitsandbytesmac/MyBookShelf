@@ -35,6 +35,8 @@ export async function deleteAccount(req, res) {
         await client.query("DELETE FROM reading_activities WHERE user_id = $1", [userId]);
         await client.query("DELETE FROM books WHERE user_id = $1", [userId]);
         await client.query("DELETE FROM password_resets WHERE user_id = $1", [userId]);
+        await client.query("DELETE FROM reading_goals WHERE user_id = $1", [userId]);
+        await client.query("DELETE FROM challenges WHERE user_id = $1", [userId]);
         await client.query("DELETE FROM users WHERE id = $1", [userId]);
 
         await client.query("COMMIT");

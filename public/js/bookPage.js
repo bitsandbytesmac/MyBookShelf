@@ -73,9 +73,13 @@ function hero(book) {
                 statusBadge(book.status),
                 book.format ? h("span", { class: "badge meta" }, book.format) : null,
                 book.ownership ? h("span", { class: "badge meta" }, book.ownership) : null,
+                book.ageCategory ? h("span", { class: "badge meta" }, book.ageCategory) : null,
                 book.genres.map((g) => h("span", { class: "badge tag" }, g)),
                 book.subgenres.map((g) => h("span", { class: "badge tag-sub" }, g))
             ),
+            book.tropes.length
+                ? h("div", { class: "badge-row trope-row", "aria-label": "Tropes" }, book.tropes.map((t) => h("span", { class: "badge trope" }, t)))
+                : null,
             summary,
             toggle,
             h("div", { class: "hero-actions" },
@@ -173,11 +177,24 @@ function progressCard(book) {
 function reviewCard(book) {
     const hasReview = book.rating || book.spice || book.review || book.quotes.length || book.dateStarted || book.dateFinished;
 
+    // Ticking a box saves straight away.
+    const toggle = (field, label, hint) => h("label", { class: "check" },
+        h("input", {
+            type: "checkbox", checked: book[field],
+            onchange: (e) => run(() => updateBook(book.id, { [field]: e.target.checked }),
+                e.target.checked ? `${label} ticked off` : `${label} unticked`)
+        }),
+        h("span", {}, label, h("small", {}, hint))
+    );
+
     const card = h("section", { class: "card card-pad" },
         h("div", { class: "review-head" },
             h("h3", {}, "My review"),
             h("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => openReview(book) }, hasReview ? "Edit" : "Review")
-        )
+        ),
+        h("div", { class: "check-row review-checks" },
+            toggle("reviewed", "Review", "Written or posted"),
+            toggle("journaled", "Reading journal", "Added to my journal"))
     );
 
     if (!hasReview) {
@@ -212,12 +229,28 @@ function detailsCard(book) {
             row("Series", book.series ? h("a", { href: seriesHref(book.series) }, seriesLabel(book)) : ""),
             row("Format", book.format),
             row("Status", book.ownership),
+            row("Age category", book.ageCategory),
             row("Pages", book.totalPages ? fmt.num(book.totalPages) : ""),
             row("Genres", book.genres.join(", ")),
             row("Sub-genres", book.subgenres.join(", ")),
+            row("Tropes", book.tropes.join(", ")),
+            row("Content warnings", book.contentWarnings.length
+                ? h("details", { class: "cw-reveal" },
+                    h("summary", {}, `Show ${fmt.plural(book.contentWarnings.length, "warning")}`),
+                    h("span", {}, book.contentWarnings.join(", ")))
+                : ""),
+            row("Challenges", inChallenges(book)),
             row("Added", book.createdAt ? fmt.date(String(book.createdAt).slice(0, 10)) : "")
         )
     );
+}
+
+// "A to Z Challenge · B, Summer Reads · A book set by the sea" as links (empty if none).
+function inChallenges(book) {
+    const links = state.challenges.flatMap((c) => c.items
+        .filter((it) => it.bookId === book.id)
+        .map((it) => h("a", { href: `#/challenges/${encodeURIComponent(c.id)}` }, `${c.name} · ${it.label}`)));
+    return links.length ? links.flatMap((a, i) => [i ? ", " : null, a]) : "";
 }
 
 // ---------- Notes ----------

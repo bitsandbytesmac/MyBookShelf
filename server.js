@@ -8,6 +8,7 @@ import uploadRoutes from "./src/routes/uploadRoutes.js";
 import activityRoutes from "./src/routes/activityRoutes.js";
 import goalRoutes from "./src/routes/goalRoutes.js";
 import themeRoutes from "./src/routes/themeRoutes.js";
+import challengeRoutes from "./src/routes/challengeRoutes.js";
 import { sameOriginOnly } from "./src/utils/session.js";
 
 dotenv.config();
@@ -72,6 +73,7 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/goals", goalRoutes);
 app.use("/api/theme", themeRoutes);
+app.use("/api/challenges", challengeRoutes);
 
 // Start server locally
 if (process.env.NODE_ENV !== "production") {

@@ -73,10 +73,14 @@ export function normalizeBook(row) {
         coverUrl: row.cover_url || null,
         series: row.series || "",
         seriesNumber: row.series_number != null ? Number(row.series_number) : null, // NUMERIC arrives as a string
+        seriesTotal: row.series_total != null ? Number(row.series_total) : null,
         genres,
         subgenres: Array.isArray(row.subgenres) ? row.subgenres : [],
+        tropes: Array.isArray(row.tropes) ? row.tropes : [],
+        contentWarnings: Array.isArray(row.content_warnings) ? row.content_warnings : [],
         format: row.format || "",
         ownership: row.ownership || "",
+        ageCategory: row.age_category || "",
         status: row.status,
         totalPages: Number(row.total_pages) || 0,
         currentPage: Number(row.current_page) || 0,
@@ -88,6 +92,8 @@ export function normalizeBook(row) {
         dateStarted: dateOnly(row.date_started),
         dateFinished: dateOnly(row.date_finished),
         isFavorite: Boolean(row.is_favorite),
+        reviewed: Boolean(row.reviewed),
+        journaled: Boolean(row.journaled),
         createdAt: row.created_at || null
     };
 }
@@ -101,10 +107,14 @@ function toPayload(book) {
         coverUrl: book.coverUrl || null,
         series: book.series || null,
         seriesNumber: book.series ? book.seriesNumber ?? null : null,
+        seriesTotal: book.series ? book.seriesTotal ?? null : null,
         genres: book.genres || [],
         subgenres: book.subgenres || [],
+        tropes: book.tropes || [],
+        contentWarnings: book.contentWarnings || [],
         format: book.format || null,
         ownership: book.ownership || null,
+        ageCategory: book.ageCategory || null,
         status: book.status,
         totalPages: book.totalPages || 0,
         currentPage: book.currentPage || 0,
@@ -115,7 +125,9 @@ function toPayload(book) {
         notes: book.notes || null,
         dateStarted: book.dateStarted || null,
         dateFinished: book.dateFinished || null,
-        isFavorite: Boolean(book.isFavorite)
+        isFavorite: Boolean(book.isFavorite),
+        reviewed: Boolean(book.reviewed),
+        journaled: Boolean(book.journaled)
     };
 }
 
@@ -159,6 +171,29 @@ export const api = {
     async updateGoals(goals) {
         return (await request("/api/goals", { method: "PUT", body: goals })).data;
     },
+
+    async getCustomGoals() {
+        return (await request("/api/goals/custom")).data;
+    },
+    async createCustomGoal(goal) {
+        return (await request("/api/goals/custom", { method: "POST", body: goal })).data;
+    },
+    async updateCustomGoal(id, goal) {
+        return (await request(`/api/goals/custom/${encodeURIComponent(id)}`, { method: "PUT", body: goal })).data;
+    },
+    deleteCustomGoal: (id) => request(`/api/goals/custom/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+    async getChallenges() {
+        return (await request("/api/challenges")).data;
+    },
+    async createChallenge(challenge) {
+        return (await request("/api/challenges", { method: "POST", body: challenge })).data;
+    },
+    async updateChallenge(id, challenge) {
+        const { name, description, items } = challenge;
+        return (await request(`/api/challenges/${encodeURIComponent(id)}`, { method: "PUT", body: { name, description, items } })).data;
+    },
+    deleteChallenge: (id) => request(`/api/challenges/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
     async getTheme() {
         return (await request("/api/theme")).data;

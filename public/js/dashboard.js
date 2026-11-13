@@ -1,5 +1,8 @@
-import { state, percent, booksFinished, saveGoals } from "./store.js";
-import { h, icon, cover, progressBar, fmt, toast, attachTooltip } from "./ui.js";
+import {
+    state, percent, booksFinished, saveGoals, saveCustomGoal, deleteCustomGoal, goalProgress, goalTitle,
+    genreOptions, GOAL_FILTER_LABELS, FORMATS, AGE_CATEGORIES
+} from "./store.js";
+import { h, icon, cover, progressBar, fmt, toast, attachTooltip, modal, confirmDialog } from "./ui.js";
 import { openAddBook } from "./dialogs.js";
 import { openCustomize } from "./theme.js";
 
@@ -85,7 +88,115 @@ export function renderDashboard() {
     );
 
     // 7. Quotes
-    return h("div", {}, head, tiles, shelfSection, goalsGrid, statsGrid, quotesSection());
+    return h("div", {}, head, tiles, shelfSection, goalsGrid, customGoalsSection(), statsGrid, quotesSection());
+}
+
+// ---------- Custom goals ----------
+
+function customGoalsSection() {
+    const goals = state.customGoals;
+    return h("section", { class: "section" },
+        h("div", { class: "section-head" },
+            h("div", {},
+                h("h2", {}, "My goals"),
+                h("p", { class: "section-sub" }, "Your own targets, counted from the books you finish")),
+            h("button", { class: "btn btn-sm", type: "button", onclick: () => openGoalDialog() }, icon("plus"), "Add goal")
+        ),
+        goals.length
+            ? h("div", { class: "custom-goals" }, goals.map(customGoalCard))
+            : h("div", { class: "card empty-sm" },
+                "Set a goal like “5 Classics this year”, “3,000 pages this month” or “10 audiobooks this year”.")
+    );
+}
+
+function customGoalCard(goal) {
+    const { done, percent: pct } = goalProgress(goal);
+    const left = Math.max(goal.target - done, 0);
+    const unit = goal.metric === "pages" ? "pages" : goal.target === 1 ? "book" : "books";
+    const scope = [goal.period === "month" ? "This month" : "This year", goal.filterValue].filter(Boolean).join(" · ");
+
+    return h("section", { class: `card custom-goal${left ? "" : " is-done"}` },
+        h("div", { class: "custom-goal-head" },
+            h("div", { style: { minWidth: 0 } },
+                h("h3", {}, goalTitle(goal)),
+                h("p", { class: "sub" }, scope)),
+            h("div", { class: "custom-goal-actions" },
+                h("button", { class: "icon-btn", type: "button", "aria-label": `Edit goal ${goalTitle(goal)}`, title: "Edit", onclick: () => openGoalDialog(goal) }, icon("edit")),
+                h("button", {
+                    class: "icon-btn", type: "button", "aria-label": `Delete goal ${goalTitle(goal)}`, title: "Delete",
+                    onclick: async () => {
+                        if (!(await confirmDialog({ title: "Delete this goal?", text: `"${goalTitle(goal)}" will be removed. Your books aren't affected.` }))) return;
+                        try {
+                            await deleteCustomGoal(goal.id);
+                            toast("Goal deleted");
+                        } catch (error) {
+                            toast(error.message, { error: true });
+                        }
+                    }
+                }, icon("trash")))
+        ),
+        h("div", { class: "goal-number" }, fmt.num(done), h("span", {}, ` / ${fmt.num(goal.target)} ${unit}`)),
+        progressBar(pct),
+        h("p", { class: "goal-foot" }, left ? `${fmt.num(left)} ${goal.metric === "pages" ? "pages" : left === 1 ? "book" : "books"} to go · ${pct}%` : "Goal reached! 🎉")
+    );
+}
+
+function openGoalDialog(goal = null) {
+    const field = (id, label, control) => h("div", { class: "field" }, h("label", { for: id }, label), control);
+    const select = (id, options, value) =>
+        h("select", { class: "select", id }, options.map(([v, text]) => h("option", { value: v, selected: v === value }, text)));
+
+    const name = h("input", { class: "input", id: "cgName", maxlength: 100, value: goal?.title || "", placeholder: "Optional, e.g. Classics catch-up", autocomplete: "off" });
+    const target = h("input", { class: "input", id: "cgTarget", type: "number", min: 1, inputmode: "numeric", value: goal?.target ?? "", placeholder: "10" });
+    const metric = select("cgMetric", [["books", "Books"], ["pages", "Pages"]], goal?.metric || "books");
+    const period = select("cgPeriod", [["year", "This year"], ["month", "This month"]], goal?.period || "year");
+    const filterType = select("cgFilter", [["", "Any book"], ...Object.entries(GOAL_FILTER_LABELS)], goal?.filterType || "");
+    const filterValue = h("select", { class: "select", id: "cgFilterValue" });
+    const valueField = field("cgFilterValue", "Which one", filterValue);
+
+    const choices = {
+        genre: () => [...new Set([...genreOptions("genres"), ...genreOptions("subgenres")])],
+        format: () => FORMATS,
+        age: () => AGE_CATEGORIES
+    };
+    const syncValues = () => {
+        const type = filterType.value;
+        valueField.classList.toggle("hidden", !type);
+        if (!type) return;
+        const options = choices[type]();
+        const current = goal?.filterType === type ? goal.filterValue : options[0];
+        filterValue.replaceChildren(...[...new Set([current, ...options])].map((o) => h("option", { value: o, selected: o === current }, o)));
+    };
+    filterType.addEventListener("change", syncValues);
+    syncValues();
+
+    modal({
+        title: goal ? "Edit goal" : "Add a reading goal",
+        size: "sm",
+        submitLabel: goal ? "Save goal" : "Add goal",
+        body: h("div", { class: "stack" },
+            h("div", { class: "field-row" }, field("cgTarget", "Target", target), field("cgMetric", "Count", metric)),
+            h("div", { class: "field-row" }, field("cgPeriod", "When", period), field("cgFilter", "Only count", filterType)),
+            valueField,
+            field("cgName", "Name", name),
+            h("p", { class: "hint" }, "Books count once they're marked Read with a finish date in that month or year. Pages add up the page counts of those books.")
+        ),
+        initialFocus: target,
+        async onSubmit({ setError }) {
+            const n = Number(target.value);
+            const max = metric.value === "pages" ? 1000000 : 1000;
+            if (!Number.isInteger(n) || n < 1 || n > max) return setError(`Target must be a whole number from 1 to ${max.toLocaleString()}.`), false;
+            await saveCustomGoal({
+                title: name.value.trim(),
+                metric: metric.value,
+                period: period.value,
+                target: n,
+                filterType: filterType.value || null,
+                filterValue: filterType.value ? filterValue.value : null
+            }, goal?.id);
+            toast(goal ? "Goal saved" : "Goal added");
+        }
+    });
 }
 
 const SHELF_LIMIT = 36;
@@ -224,14 +335,14 @@ function genresCard() {
             ? `From ${fmt.plural(read.length, "finished book")}`
             : "No finished books yet — showing your whole shelf"),
         top.length
-            ? h("div", { class: "hbars", role: "list" }, top.map(([label, value]) => {
-                const row = h("div", { class: "hbar", role: "listitem" },
-                    h("span", { class: "hbar-label" }, label),
-                    h("div", { class: "hbar-track" }, h("div", { class: "hbar-fill", style: { width: `${(value / max) * 100}%` } })),
-                    h("span", { class: "hbar-value" }, value)
+            ? h("div", { class: "vbars", role: "list", style: { gridTemplateColumns: `repeat(${top.length}, minmax(0, 1fr))` } }, top.map(([label, value]) => {
+                const col = h("div", { class: "vbar", role: "listitem", "aria-label": `${label}: ${fmt.plural(value, "book")}` },
+                    h("span", { class: "vbar-value" }, value),
+                    h("div", { class: "vbar-track" }, h("div", { class: "vbar-fill", style: { height: `${(value / max) * 100}%` } })),
+                    h("span", { class: "vbar-label", "aria-hidden": "true" }, label)
                 );
-                attachTooltip(row, `${label}: ${fmt.plural(value, "book")}`);
-                return row;
+                attachTooltip(col, `${label}: ${fmt.plural(value, "book")}`);
+                return col;
             }))
             : h("p", { class: "empty-sm" }, "Add genres to your books to see them here.")
     );

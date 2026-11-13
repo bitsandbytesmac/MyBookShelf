@@ -134,7 +134,7 @@ export function renderAuthor(params, id) {
                 h("a", { class: "card series-chip", href: seriesHref(s.name) },
                     h("div", {},
                         h("strong", {}, s.name),
-                        h("span", { class: "sub" }, `${s.read} of ${fmt.plural(s.books.length, "book")} read`)),
+                        h("span", { class: "sub" }, `${s.read} of ${fmt.plural(s.outOf, "book")} read`)),
                     seriesBadge(s.status),
                     progressBar(s.percent, { thin: true })
                 )))

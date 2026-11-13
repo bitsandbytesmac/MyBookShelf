@@ -95,10 +95,11 @@ export function statusBadge(status) {
 export const authorHref = (name) => `#/author/${encodeURIComponent(name)}`;
 export const seriesHref = (name) => `#/series/${encodeURIComponent(name)}`;
 
-// "A Court of Thorns and Roses · Book 2"
+// "A Court of Thorns and Roses · Book 2 of 5"
 export function seriesLabel(book) {
     if (!book.series) return "";
-    return book.seriesNumber ? `${book.series} · Book ${book.seriesNumber}` : book.series;
+    const of = book.seriesTotal ? ` of ${book.seriesTotal}` : "";
+    return book.seriesNumber ? `${book.series} · Book ${book.seriesNumber}${of}` : book.series;
 }
 
 export function initials(name) {

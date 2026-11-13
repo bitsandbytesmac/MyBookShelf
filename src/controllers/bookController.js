@@ -4,8 +4,9 @@ import { deleteUnusedCovers } from "../services/coverStorage.js";
 export const BOOK_STATUSES = ["To Be Read", "Reading", "Read", "DNF", "Paused"];
 export const BOOK_FORMATS = ["Paperback", "Hardbound", "E-book", "Audiobook"];
 export const BOOK_OWNERSHIP = ["Owned", "Borrowed", "Gifted"];
+export const AGE_CATEGORIES = ["Children", "Middle Grade", "Young Adult", "New Adult", "Adult"];
 
-const LIMITS = { text: 300, summary: 10000, longText: 20000, tags: 20, tag: 60, quotes: 100, quote: 2000 };
+const LIMITS = { text: 300, summary: 10000, longText: 20000, tags: 20, labels: 40, tag: 60, quotes: 100, quote: 2000 };
 
 // ---------- Validation ----------
 
@@ -57,6 +58,14 @@ function seriesNumber(value) {
     return { value: n };
 }
 
+// How many books the whole series has (1-999), so progress can read "1 of 6".
+function seriesTotal(value) {
+    if (value === undefined || value === null || value === "") return { value: null };
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 1 || n > 999) return { error: "Books in series must be a whole number from 1 to 999." };
+    return { value: n };
+}
+
 function pageNumber(value, label) {
     if (value === undefined || value === null || value === "") return { value: 0 };
     const n = Number(value);
@@ -74,10 +83,14 @@ function parseBook(body = {}) {
         cover_url: optionalText(body.coverUrl, 2000, "Cover URL"),
         series: optionalText(body.series, 200, "Series"),
         series_number: seriesNumber(body.seriesNumber),
+        series_total: seriesTotal(body.seriesTotal),
         genres: stringList(body.genres, LIMITS.tags, LIMITS.tag, "Genres"),
         subgenres: stringList(body.subgenres, LIMITS.tags, LIMITS.tag, "Sub-genres"),
         format: optionalChoice(body.format, BOOK_FORMATS, "Format"),
         ownership: optionalChoice(body.ownership, BOOK_OWNERSHIP, "Ownership"),
+        age_category: optionalChoice(body.ageCategory, AGE_CATEGORIES, "Age category"),
+        tropes: stringList(body.tropes, LIMITS.labels, LIMITS.tag, "Tropes"),
+        content_warnings: stringList(body.contentWarnings, LIMITS.labels, LIMITS.tag, "Content warnings"),
         status: optionalChoice(body.status || "To Be Read", BOOK_STATUSES, "Book status"),
         total_pages: pageNumber(body.totalPages, "Total pages"),
         current_page: pageNumber(body.currentPage, "Current page"),
@@ -98,6 +111,7 @@ function parseBook(body = {}) {
     if (!values.title) return { error: "Please provide a title." };
     if (!values.author) return { error: "Please provide an author." };
     if (values.series_number !== null && !values.series) return { error: "Add the series name for this book number." };
+    if (values.series_total !== null && !values.series) return { error: "Add the series name for the number of books in it." };
 
     if (values.total_pages > 0 && values.current_page > values.total_pages) {
         return { error: "Current page cannot exceed total pages." };
@@ -107,6 +121,8 @@ function parseBook(body = {}) {
     }
 
     values.is_favorite = Boolean(body.isFavorite);
+    values.reviewed = Boolean(body.reviewed);
+    values.journaled = Boolean(body.journaled);
     values.genre = values.genres[0] || "";                     // legacy single-genre column
     values.completed_at = values.date_finished;                 // legacy completion column
 
@@ -114,10 +130,21 @@ function parseBook(body = {}) {
 }
 
 const COLUMNS = [
-    "title", "author", "summary", "cover_url", "series", "series_number", "genres", "subgenres", "format", "ownership", "status",
+    "title", "author", "summary", "cover_url", "series", "series_number", "series_total", "genres", "subgenres",
+    "format", "ownership", "age_category", "tropes", "content_warnings", "status",
     "total_pages", "current_page", "rating", "spice", "quotes", "review", "personal_notes",
-    "date_started", "date_finished", "is_favorite", "genre", "completed_at"
+    "date_started", "date_finished", "is_favorite", "reviewed", "journaled", "genre", "completed_at"
 ];
+
+// The series total belongs to the whole series, so copy it to the user's other books in the same series.
+async function syncSeriesTotal(db, userId, values) {
+    if (!values.series) return;
+    await db.query(
+        `UPDATE books SET series_total = $1
+         WHERE user_id = $2 AND LOWER(series) = LOWER($3) AND series_total IS DISTINCT FROM $1`,
+        [values.series_total, userId, values.series]
+    );
+}
 
 function sendError(res, status, message) {
     return res.status(status).json({ message, status: "error" });
@@ -144,20 +171,30 @@ export async function addBook(req, res) {
     const { values, error } = parseBook(req.body);
     if (error) return sendError(res, 400, error);
 
+    let client;
+
     try {
+        client = await pool.connect();
+        await client.query("BEGIN");
+
         const columns = ["id", "user_id", ...COLUMNS];
         const params = [Date.now(), req.user.id, ...COLUMNS.map((c) => values[c])];
         const placeholders = params.map((_, i) => `$${i + 1}`).join(", ");
 
-        const result = await pool.query(
+        const result = await client.query(
             `INSERT INTO books (${columns.join(", ")}) VALUES (${placeholders}) RETURNING *`,
             params
         );
+        await syncSeriesTotal(client, req.user.id, values);
 
+        await client.query("COMMIT");
         res.status(201).json({ message: "Book added successfully!", status: "success", data: result.rows[0] });
     } catch (err) {
+        if (client) await client.query("ROLLBACK").catch(() => {});
         console.error("Error adding book:", err);
         sendError(res, 500, "Failed to add book.");
+    } finally {
+        client?.release();
     }
 }
 
@@ -201,6 +238,8 @@ export async function updateBook(req, res) {
                 [req.user.id, req.params.id, values.title, previousPage, values.current_page, values.current_page - previousPage]
             );
         }
+
+        await syncSeriesTotal(client, req.user.id, values);
 
         await client.query("COMMIT");
 

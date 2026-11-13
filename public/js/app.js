@@ -6,6 +6,7 @@ import { renderLibrary } from "./library.js";
 import { renderBookPage } from "./bookPage.js";
 import { renderAuthors, renderAuthor } from "./authors.js";
 import { renderSeries } from "./series.js";
+import { renderChallenges } from "./challenges.js";
 import { openAddBook } from "./dialogs.js";
 import { h, modal, toast } from "./ui.js";
 import { openCustomize, syncTheme } from "./theme.js";
@@ -18,7 +19,8 @@ const ROUTES = {
     book: { render: renderBookPage, title: () => document.querySelector(".book-hero h1")?.textContent || "Book", tab: "library" },
     authors: { render: renderAuthors, title: () => "Authors", tab: "authors" },
     author: { render: renderAuthor, title: () => document.querySelector(".author-hero h1")?.textContent || "Author", tab: "authors" },
-    series: { render: renderSeries, title: () => document.querySelector(".series-hero h1")?.textContent || "Series", tab: "series" }
+    series: { render: renderSeries, title: () => document.querySelector(".series-hero h1")?.textContent || "Series", tab: "series" },
+    challenges: { render: renderChallenges, title: () => document.querySelector(".board-title")?.textContent || "Challenges", tab: "challenges" }
 };
 
 let currentKey = null;

@@ -4,6 +4,7 @@ import { api } from "./api.js";
 export const STATUSES = ["To Be Read", "Reading", "Read", "Paused", "DNF"];
 export const FORMATS = ["Paperback", "Hardbound", "E-book", "Audiobook"];
 export const OWNERSHIP = ["Owned", "Borrowed", "Gifted"];
+export const AGE_CATEGORIES = ["Children", "Middle Grade", "Young Adult", "New Adult", "Adult"];
 
 export const GENRES = [
     "Romance", "Fantasy", "Science Fiction", "Mystery", "Thriller", "Horror", "Historical Fiction",
@@ -19,6 +20,21 @@ export const SUBGENRES = [
     "Women's Fiction", "Family Saga"
 ];
 
+export const TROPES = [
+    "Enemies to Lovers", "Friends to Lovers", "Rivals to Lovers", "Slow Burn", "Forced Proximity",
+    "Only One Bed", "Fake Dating", "Marriage of Convenience", "Second Chance", "Grumpy x Sunshine",
+    "Forbidden Love", "Love Triangle", "Found Family", "Chosen One", "Morally Grey",
+    "Who Did This to You", "Touch Her and Die", "Secret Identity", "Redemption Arc", "Academy / Magic School",
+    "Heist", "Quest", "Small Town", "Dual POV", "Unreliable Narrator", "Time Travel"
+];
+
+export const CONTENT_WARNINGS = [
+    "Death", "Death of a parent", "Grief", "Violence", "Gore", "Torture", "War", "Kidnapping",
+    "Sexual content", "Sexual assault", "Abuse", "Domestic abuse", "Child abuse", "Self-harm", "Suicide",
+    "Mental illness", "Addiction", "Eating disorder", "Terminal illness", "Pregnancy loss",
+    "Animal death", "Cheating", "Racism", "Homophobia"
+];
+
 const listeners = new Set();
 
 export const state = {
@@ -26,6 +42,8 @@ export const state = {
     activities: [],
     statistics: null,
     goals: { monthlyGoal: 2, yearlyGoal: 12 },
+    customGoals: [],
+    challenges: [],
     loaded: false
 };
 
@@ -42,23 +60,28 @@ export function getBook(id) {
     return state.books.find((book) => book.id === String(id));
 }
 
-// Every genre/sub-genre in use, plus the defaults.
+// Every genre/sub-genre/trope/content warning in use, plus the defaults.
+const DEFAULT_OPTIONS = { genres: GENRES, subgenres: SUBGENRES, tropes: TROPES, contentWarnings: CONTENT_WARNINGS };
 export function genreOptions(kind = "genres") {
-    const defaults = kind === "genres" ? GENRES : SUBGENRES;
-    const used = state.books.flatMap((b) => b[kind]);
+    const defaults = DEFAULT_OPTIONS[kind];
+    const used = state.books.flatMap((b) => b[kind] || []);
     return [...new Set([...defaults, ...used])];
 }
 
 // ---------- Loading ----------
 
 export async function loadAll() {
-    const [books, goals] = await Promise.all([
+    const [books, goals, customGoals, challenges] = await Promise.all([
         api.getBooks(),
         api.getGoals().catch(() => null),
+        api.getCustomGoals().catch(() => []),
+        api.getChallenges().catch(() => []),
         refreshActivity({ silent: true })
     ]);
     state.books = books;
     if (goals) state.goals = goals;
+    state.customGoals = customGoals;
+    state.challenges = challenges;
     state.loaded = true;
     emit();
 }
@@ -121,11 +144,23 @@ export function applyReadingRules(next, previous = null) {
 
 // ---------- Mutations ----------
 
+// The server copies a book's series total to the rest of its series; mirror that locally.
+function syncSeriesTotal(saved) {
+    if (!saved.series) return;
+    const key = nameKey(saved.series);
+    for (const b of state.books) if (b.series && nameKey(b.series) === key) b.seriesTotal = saved.seriesTotal;
+}
+
 export async function createBook(data) {
-    const saved = await api.createBook(applyReadingRules({
-        status: "To Be Read", genres: [], subgenres: [], quotes: [], isFavorite: false, ...data
-    }));
+    const book = {
+        status: "To Be Read", genres: [], subgenres: [], tropes: [], contentWarnings: [], quotes: [], isFavorite: false, ...data
+    };
+    // A new book joins its series' existing total instead of clearing it.
+    if (book.series && book.seriesTotal == null) book.seriesTotal = findSeries(book.series)?.total ?? null;
+
+    const saved = await api.createBook(applyReadingRules(book));
     state.books.unshift(saved);
+    syncSeriesTotal(saved);
     emit();
     return saved;
 }
@@ -138,6 +173,7 @@ export async function updateBook(id, changes) {
     const next = applyReadingRules({ ...current, ...changes }, current);
     const saved = await api.updateBook(id, next);
     Object.assign(current, saved);
+    syncSeriesTotal(saved);
 
     // The server logs a reading session whenever the page count goes up.
     if (saved.currentPage > previousPage) await refreshActivity({ silent: true });
@@ -157,6 +193,61 @@ export async function saveGoals(goals) {
     emit();
 }
 
+export async function saveCustomGoal(goal, id = null) {
+    if (id) {
+        const saved = await api.updateCustomGoal(id, goal);
+        state.customGoals = state.customGoals.map((g) => (g.id === id ? saved : g));
+    } else {
+        state.customGoals.push(await api.createCustomGoal(goal));
+    }
+    emit();
+}
+
+export async function deleteCustomGoal(id) {
+    await api.deleteCustomGoal(id);
+    state.customGoals = state.customGoals.filter((g) => g.id !== id);
+    emit();
+}
+
+// ---------- Challenges ----------
+
+export function getChallenge(id) {
+    return state.challenges.find((c) => c.id === String(id));
+}
+
+export async function createChallenge(data) {
+    const saved = await api.createChallenge(data);
+    state.challenges.unshift(saved);
+    emit();
+    return saved;
+}
+
+export async function updateChallenge(id, changes) {
+    const current = getChallenge(id);
+    if (!current) throw new Error("Challenge not found.");
+    Object.assign(current, await api.updateChallenge(id, { ...current, ...changes }));
+    emit();
+    return current;
+}
+
+export async function deleteChallenge(id) {
+    await api.deleteChallenge(id);
+    state.challenges = state.challenges.filter((c) => c.id !== String(id));
+    emit();
+}
+
+// A prompt counts as done when ticked, or when its linked book is finished.
+export function challengeItemDone(item) {
+    if (item.done) return true;
+    return item.bookId ? getBook(item.bookId)?.status === "Read" : false;
+}
+
+export function challengeProgress(challenge) {
+    const total = challenge.items.length;
+    const done = challenge.items.filter(challengeItemDone).length;
+    return { done, total, percent: total ? Math.round((done / total) * 100) : 0 };
+}
+
 // ---------- Derived ----------
 
 export function booksFinished({ year, month } = {}) {
@@ -165,6 +256,36 @@ export function booksFinished({ year, month } = {}) {
         const [y, m] = b.dateFinished.split("-").map(Number);
         return (year === undefined || y === year) && (month === undefined || m === month);
     });
+}
+
+// ---------- Custom goal progress ----------
+
+export const GOAL_FILTER_LABELS = { genre: "Genre", format: "Format", age: "Age category" };
+
+function matchesGoalFilter(book, goal) {
+    const v = (goal.filterValue || "").toLowerCase();
+    if (goal.filterType === "genre") return [...book.genres, ...book.subgenres].some((g) => g.toLowerCase() === v);
+    if (goal.filterType === "format") return (book.format || "").toLowerCase() === v;
+    if (goal.filterType === "age") return (book.ageCategory || "").toLowerCase() === v;
+    return true;
+}
+
+// Counts finished books (or their pages) in the current month/year that match the goal's filter.
+export function goalProgress(goal) {
+    const now = new Date();
+    const year = now.getFullYear();
+    const books = booksFinished(goal.period === "month" ? { year, month: now.getMonth() + 1 } : { year })
+        .filter((b) => matchesGoalFilter(b, goal));
+    const done = goal.metric === "pages" ? books.reduce((s, b) => s + (b.totalPages || 0), 0) : books.length;
+    return { done, books, percent: Math.min(100, Math.round((done / goal.target) * 100)) };
+}
+
+// "12 Classics books this year" when the goal has no name of its own.
+export function goalTitle(goal) {
+    if (goal.title) return goal.title;
+    const what = goal.metric === "pages" ? "pages" : "books";
+    const filter = goal.filterValue ? ` ${goal.filterValue}` : "";
+    return `${goal.target.toLocaleString()}${filter} ${what} this ${goal.period}`;
 }
 
 // ---------- Authors & series (derived from the books, nothing extra stored) ----------
@@ -210,14 +331,20 @@ export function findSeries(name) {
     return seriesList().find((s) => s.key === nameKey(name || "")) || null;
 }
 
+// total: the "Books in series" the reader entered (null if never set). outOf: total, else the books on the shelf.
+// With a total set, novellas (1.5, 2.5...) don't count toward it, so "3 of 3" means the main books.
 function summarizeSeries(series) {
     const books = [...series.books].sort(bySeriesOrder);
-    const read = books.filter((b) => b.status === "Read").length;
+    const total = Math.max(0, ...books.map((b) => b.seriesTotal || 0)) || null;
+    const finished = books.filter((b) => b.status === "Read");
+    const counted = total ? finished.filter((b) => b.seriesNumber == null || Number.isInteger(b.seriesNumber)) : finished;
+    const outOf = total || books.length;
+    const read = Math.min(counted.length, outOf);
     const inProgress = books.find((b) => b.status === "Reading" || b.status === "Paused");
     const next = inProgress || books.find((b) => b.status === "To Be Read") || null;
-    const status = read === books.length ? "Completed" : read || inProgress ? "In progress" : "Not started";
+    const status = read >= outOf ? "Completed" : finished.length || inProgress ? "In progress" : "Not started";
     const authors = [...new Set(books.flatMap(authorNames))];
-    return { ...series, books, read, next, status, authors, percent: Math.round((read / books.length) * 100) };
+    return { ...series, books, read, total, outOf, next, status, authors, percent: Math.round((read / outOf) * 100) };
 }
 
 export function seriesNames() {

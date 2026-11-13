@@ -1,8 +1,9 @@
 // Add book (Google Books search or manual), Edit details, and Review dialogs.
 import { api } from "./api.js";
 import {
-    state, createBook, updateBook, genreOptions, percent, seriesNames,
-    STATUSES, FORMATS, OWNERSHIP, GENRES
+    state, createBook, updateBook, genreOptions, percent, seriesNames, findSeries, getBook,
+    createChallenge, updateChallenge,
+    STATUSES, FORMATS, OWNERSHIP, GENRES, AGE_CATEGORIES
 } from "./store.js";
 import { h, icon, cover, progressBar, rateInput, multiSelect, modal, toast, stripHtml, fmt } from "./ui.js";
 
@@ -60,30 +61,157 @@ function matchSeriesName(name) {
     return seriesNames().find((n) => n.toLowerCase() === clean.toLowerCase()) || clean;
 }
 
-// Series name (suggests the user's existing series) + number in series.
+// Series name (suggests the user's existing series) + number in series + how many books the series has.
 function seriesFields(book, prefix) {
     const listId = `${prefix}SeriesOptions`;
+    const nameInput = h("input", { class: "input", id: `${prefix}Series`, value: book.series || "", list: listId, autocomplete: "off", maxlength: 200, placeholder: "Leave blank if it's a standalone" });
+    const totalInput = h("input", { class: "input", id: `${prefix}SeriesTotal`, type: "number", min: 1, max: 999, step: 1, inputmode: "numeric", value: book.seriesTotal ?? "" });
+
+    // Picking a series you already track fills in its total (unless you've typed one yourself).
+    let typedTotal = false;
+    totalInput.addEventListener("input", () => (typedTotal = true));
+    nameInput.addEventListener("input", () => {
+        if (typedTotal) return;
+        totalInput.value = findSeries(nameInput.value)?.total ?? "";
+    });
+
     return h("div", { class: "field-row series-fields" },
         h("div", { class: "field" },
             h("label", { for: `${prefix}Series` }, "Series"),
-            h("input", { class: "input", id: `${prefix}Series`, value: book.series || "", list: listId, autocomplete: "off", maxlength: 200, placeholder: "Leave blank if it's a standalone" }),
+            nameInput,
             h("datalist", { id: listId }, seriesNames().map((n) => h("option", { value: n })))
         ),
         h("div", { class: "field" },
             h("label", { for: `${prefix}SeriesNo` }, "Book #"),
-            h("input", { class: "input", id: `${prefix}SeriesNo`, type: "number", min: 0, step: "any", inputmode: "decimal", value: book.seriesNumber ?? "", placeholder: "1" })
+            h("input", { class: "input", id: `${prefix}SeriesNo`, type: "number", min: 0, step: "any", inputmode: "decimal", value: book.seriesNumber ?? "" })
+        ),
+        h("div", { class: "field" },
+            h("label", { for: `${prefix}SeriesTotal` }, "Books in series"),
+            totalInput
         )
     );
 }
 
-// Reads + validates the series fields. Returns { series, seriesNumber } or { error }.
+// Reads + validates the series fields. Returns { series, seriesNumber, seriesTotal } or { error }.
 function readSeries(body, prefix) {
     const series = matchSeriesName(body.querySelector(`#${prefix}Series`).value);
     const raw = body.querySelector(`#${prefix}SeriesNo`).value.trim();
+    const rawTotal = body.querySelector(`#${prefix}SeriesTotal`).value.trim();
     const seriesNumber = raw === "" ? null : Number(raw);
+    const seriesTotal = rawTotal === "" ? null : Number(rawTotal);
     if (seriesNumber !== null && (!Number.isFinite(seriesNumber) || seriesNumber <= 0)) return { error: "Book # must be a positive number, like 1, 2 or 1.5." };
     if (seriesNumber !== null && !series) return { error: "Add the series name, or clear the book number." };
-    return { series, seriesNumber: series ? seriesNumber : null };
+    if (seriesTotal !== null && (!Number.isInteger(seriesTotal) || seriesTotal < 1 || seriesTotal > 999)) return { error: "Books in series must be a whole number from 1 to 999." };
+    if (seriesTotal !== null && !series) return { error: "Add the series name, or clear the number of books in it." };
+    return { series, seriesNumber: series ? seriesNumber : null, seriesTotal: series ? seriesTotal : null };
+}
+
+// A labelled checkbox, e.g. "Review written".
+function checkbox(id, label, checked, hint) {
+    return h("label", { class: "check", for: id },
+        h("input", { type: "checkbox", id, checked: Boolean(checked) }),
+        h("span", {}, label, hint ? h("small", {}, hint) : null)
+    );
+}
+
+// Long pill lists fold away so the form stays short.
+function foldout(label, select, count) {
+    const summary = h("summary", {}, label, h("span", { class: "fold-count" }, count ? `${count} selected` : ""));
+    const box = h("details", { class: "foldout" }, summary, h("div", { class: "foldout-body" }, select.el));
+    // Refresh the count after the pill/Add handlers inside have run.
+    const recount = () => queueMicrotask(() => {
+        const n = select.value.length;
+        summary.lastChild.textContent = n ? `${n} selected` : "";
+    });
+    box.addEventListener("click", recount);
+    box.addEventListener("keydown", recount);
+    return box;
+}
+
+// ---------- Reading challenges (in Edit details) ----------
+
+// Put this book on a prompt of any existing challenge, or start a new challenge with it.
+// Returns { el, validate() -> error|null, save() }.
+function challengePicker(book) {
+    const rows = state.challenges.map((challenge) => {
+        const current = challenge.items.findIndex((it) => it.bookId === book.id);
+        const select = h("select", { class: "select", "aria-label": `Prompt in ${challenge.name}` },
+            h("option", { value: "" }, "Not in this challenge"),
+            challenge.items.map((it, i) => {
+                const other = it.bookId && it.bookId !== book.id ? getBook(it.bookId) : null;
+                return h("option", { value: String(i), selected: i === current }, other ? `${it.label} (replaces “${other.title}”)` : it.label);
+            }),
+            h("option", { value: "new" }, "+ New prompt…"));
+        const newPrompt = h("input", { class: "input hidden", maxlength: 200, placeholder: "New prompt, e.g. A book set by the sea", "aria-label": `New prompt in ${challenge.name}` });
+        select.addEventListener("change", () => {
+            newPrompt.classList.toggle("hidden", select.value !== "new");
+            if (select.value === "new") newPrompt.focus();
+        });
+        return {
+            challenge, select, newPrompt,
+            el: h("div", { class: "challenge-pick" }, h("span", { class: "challenge-pick-name" }, challenge.name), select, newPrompt)
+        };
+    });
+
+    const newName = h("input", { class: "input", maxlength: 120, placeholder: "Challenge name, e.g. Summer Reads", "aria-label": "New challenge name", autocomplete: "off" });
+    const newKind = h("input", { class: "input", maxlength: 1000, placeholder: "What kind of challenge? e.g. Read a book of every colour", "aria-label": "What kind of challenge", autocomplete: "off" });
+    const newFirst = h("input", { class: "input", maxlength: 200, placeholder: "Prompt for this book, e.g. Red (optional, uses the title)", "aria-label": "Prompt for this book", autocomplete: "off" });
+    const createBox = h("div", { class: "challenge-new hidden" }, newName, newKind, newFirst,
+        h("span", { class: "hint" }, "Add the rest of the prompts on the challenge's page."));
+    const createBtn = h("button", {
+        type: "button", class: "btn btn-sm",
+        onclick: () => {
+            const open = createBox.classList.toggle("hidden") === false;
+            createBtn.textContent = open ? "Cancel new challenge" : "+ Create a new challenge";
+            if (open) newName.focus();
+        }
+    }, "+ Create a new challenge");
+
+    const creating = () => !createBox.classList.contains("hidden") && (newName.value.trim() || newKind.value.trim() || newFirst.value.trim());
+    let section;
+
+    return {
+        // Opens the section for the reader: the first challenge's prompt list, or the "new challenge" form if they have none.
+        focusTarget() {
+            if (!rows.length) createBtn.click();
+            requestAnimationFrame(() => section.scrollIntoView({ block: "center" }));
+            return rows[0]?.select || newName;
+        },
+
+        el: section = h("div", { class: "field" },
+            h("span", { class: "label" }, "Reading challenges"),
+            rows.length
+                ? h("div", { class: "challenge-picks" }, rows.map((r) => r.el))
+                : h("span", { class: "hint" }, "You don't have any challenges yet. Create one for this book below."),
+            createBtn,
+            createBox),
+
+        validate() {
+            const blank = rows.find((r) => r.select.value === "new" && !r.newPrompt.value.trim());
+            if (blank) return `Type the new prompt for “${blank.challenge.name}”.`;
+            if (creating() && !newName.value.trim()) return "Give the new challenge a name.";
+            return null;
+        },
+
+        // Only challenges that actually change are saved.
+        async save() {
+            for (const r of rows) {
+                const choice = r.select.value;
+                let items = r.challenge.items.map((it, i) =>
+                    it.bookId === book.id && String(i) !== choice ? { ...it, bookId: null } : it);
+                if (choice === "new") items = [...items, { label: r.newPrompt.value.trim(), bookId: book.id, done: false }];
+                else if (choice !== "") items = items.map((it, i) => (String(i) === choice ? { ...it, bookId: book.id } : it));
+                if (JSON.stringify(items) !== JSON.stringify(r.challenge.items)) await updateChallenge(r.challenge.id, { items });
+            }
+            if (creating()) {
+                await createChallenge({
+                    name: newName.value.trim(),
+                    description: newKind.value.trim(),
+                    items: [{ label: newFirst.value.trim() || book.title, bookId: book.id, done: false }]
+                });
+            }
+        }
+    };
 }
 
 // ---------- Cover picker (shared by manual add + edit) ----------
@@ -297,7 +425,7 @@ function openManualAdd(prefillTitle = "") {
 
             await addAndOpen({
                 title, author,
-                series: series.series, seriesNumber: series.seriesNumber,
+                series: series.series, seriesNumber: series.seriesNumber, seriesTotal: series.seriesTotal,
                 summary: body.querySelector("#mSummary").value.trim(),
                 totalPages: pages,
                 coverUrl: await picker.resolve()
@@ -310,10 +438,14 @@ function openManualAdd(prefillTitle = "") {
 // EDIT DETAILS
 // ======================================================================
 
-export function openEditBook(book) {
+// focus: "challenges" scrolls straight to the Reading challenges section (used from the Challenges page).
+export function openEditBook(book, { focus } = {}) {
     const picker = coverPicker(book);
     const genres = multiSelect({ options: genreOptions("genres"), selected: book.genres, label: "Genres", placeholder: "Other genre" });
     const subgenres = multiSelect({ options: genreOptions("subgenres"), selected: book.subgenres, label: "Sub-genres", placeholder: "Other sub-genre" });
+    const tropes = multiSelect({ options: genreOptions("tropes"), selected: book.tropes, label: "Tropes", placeholder: "Other trope" });
+    const warnings = multiSelect({ options: genreOptions("contentWarnings"), selected: book.contentWarnings, label: "Content warnings", placeholder: "Other warning" });
+    const challenges = challengePicker(book);
 
     const total = h("input", { class: "input", id: "eTotal", type: "number", min: 0, inputmode: "numeric", value: book.totalPages || "" });
     const current = h("input", { class: "input", id: "eCurrent", type: "number", min: 0, inputmode: "numeric", value: book.currentPage || "" });
@@ -343,14 +475,22 @@ export function openEditBook(book) {
             h("div", { class: "field" }, h("label", { for: "eCurrent" }, "Page I'm on"), current)
         ),
         h("div", { class: "field" }, h("span", { class: "label" }, "Progress"), preview),
-        h("div", { class: "field" }, h("span", { class: "label" }, "Genres"), genres.el),
-        h("div", { class: "field" }, h("span", { class: "label" }, "Sub-genres"), subgenres.el)
+        h("div", { class: "field-row" },
+            selectField("eAge", "Age category", AGE_CATEGORIES, book.ageCategory, { blank: "—" }),
+            h("div", {})
+        ),
+        foldout("Genres", genres, book.genres.length),
+        foldout("Sub-genres", subgenres, book.subgenres.length),
+        foldout("Tropes", tropes, book.tropes.length),
+        foldout("Trigger / content warnings", warnings, book.contentWarnings.length),
+        challenges.el
     );
 
     modal({
         title: "Edit details",
         body,
         submitLabel: "Save changes",
+        initialFocus: focus === "challenges" ? challenges.focusTarget() : undefined,
         onSubmit: async ({ setError }) => {
             const title = body.querySelector("#eTitle").value.trim();
             const author = body.querySelector("#eAuthor").value.trim();
@@ -365,19 +505,25 @@ export function openEditBook(book) {
             if (!totalPages && currentPage) return setError("Add total pages to track progress."), false;
             const series = readSeries(body, "e");
             if (series.error) return setError(series.error), false;
+            const challengeError = challenges.validate();
+            if (challengeError) return setError(challengeError), false;
 
             await updateBook(book.id, {
                 title, author,
-                series: series.series, seriesNumber: series.seriesNumber,
+                series: series.series, seriesNumber: series.seriesNumber, seriesTotal: series.seriesTotal,
                 summary: body.querySelector("#eSummary").value.trim(),
                 status: body.querySelector("#eStatus").value,
                 format: body.querySelector("#eFormat").value,
                 ownership: body.querySelector("#eOwnership").value,
+                ageCategory: body.querySelector("#eAge").value,
                 totalPages, currentPage,
                 genres: genres.value,
                 subgenres: subgenres.value,
+                tropes: tropes.value,
+                contentWarnings: warnings.value,
                 coverUrl: await picker.resolve()
             });
+            await challenges.save();
             toast("Details saved");
         }
     });
@@ -438,7 +584,13 @@ export function openReview(book) {
             quoteList,
             h("div", { class: "quote-add" }, quoteInput, h("button", { type: "button", class: "btn btn-sm", onclick: addQuote }, icon("plus"), "Add"))
         ),
-        h("div", { class: "field" }, h("label", { for: "rReview" }, "Review"), reviewText)
+        h("div", { class: "field" }, h("label", { for: "rReview" }, "Review"), reviewText),
+        h("div", { class: "field" },
+            h("span", { class: "label" }, "Checklist"),
+            h("div", { class: "check-row" },
+                checkbox("rReviewed", "Review", book.reviewed, "Written or posted"),
+                checkbox("rJournaled", "Reading journal", book.journaled, "Added to my journal"))
+        )
     );
 
     modal({
@@ -459,6 +611,8 @@ export function openReview(book) {
                 spice: spice.value,
                 quotes,
                 review: reviewText.value.trim(),
+                reviewed: body.querySelector("#rReviewed").checked,
+                journaled: body.querySelector("#rJournaled").checked,
                 dateStarted: started.value || null,
                 dateFinished: finished.value || null
             });

@@ -71,7 +71,7 @@ function seriesCard(series) {
             h("p", { class: "sub" }, series.authors.join(", ")),
             h("div", { class: "series-progress" },
                 progressBar(series.percent, { thin: true }),
-                h("small", {}, `${series.read}/${series.books.length} read`)),
+                h("small", {}, `${series.read}/${series.outOf} read · ${series.percent}%`)),
             series.next && series.status !== "Completed"
                 ? h("p", { class: "series-next" }, h("span", {}, "Next up: "), `${bookNo(series.next)} ${series.next.title}`)
                 : null
@@ -98,7 +98,8 @@ function seriesDetail(id) {
             h("a", { class: "btn", href: "#/series" }, "All series")));
     }
 
-    const remaining = series.books.length - series.read;
+    const remaining = series.outOf - series.read;
+    const missing = series.total ? Math.max(0, series.total - series.books.filter((b) => b.seriesNumber == null || Number.isInteger(b.seriesNumber)).length) : 0;
 
     return h("div", {},
         back,
@@ -111,11 +112,15 @@ function seriesDetail(id) {
                 seriesBadge(series.status)
             ),
             h("div", { class: "series-hero-progress" },
-                h("div", { class: "series-big" }, h("strong", {}, `${series.read}`), h("span", {}, ` of ${fmt.plural(series.books.length, "book")} read`)),
+                h("div", { class: "series-big-row" },
+                    h("div", { class: "series-big" }, h("strong", {}, `${series.read}/${series.outOf}`), h("span", {}, ` ${series.outOf === 1 ? "book" : "books"} read`)),
+                    h("span", { class: "series-pct" }, `${series.percent}%`)),
                 progressBar(series.percent),
                 h("p", { class: "sub" }, series.status === "Completed"
-                    ? "You've finished every book you've added from this series. 🎉"
-                    : `${fmt.plural(remaining, "book")} to go`)
+                    ? (series.total ? "You've finished the whole series. 🎉" : "You've finished every book you've added from this series. 🎉")
+                    : `${fmt.plural(remaining, "book")} to go`
+                        + (missing ? ` · ${fmt.plural(missing, "book")} not on your shelf yet` : "")),
+                series.total ? null : h("p", { class: "hint" }, "Tip: set “Books in series” in a book's Edit details to track the whole series, e.g. 1 of 6.")
             ),
             series.next && series.status !== "Completed"
                 ? h("button", { class: "series-upnext", type: "button", onclick: () => openBook(series.next.id) },
