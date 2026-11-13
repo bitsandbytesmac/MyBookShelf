@@ -6,6 +6,7 @@ import { renderLibrary } from "./library.js";
 import { renderBookPage } from "./bookPage.js";
 import { openAddBook } from "./dialogs.js";
 import { h, modal, toast } from "./ui.js";
+import { openCustomize, syncTheme } from "./theme.js";
 
 const view = document.getElementById("view");
 
@@ -102,6 +103,11 @@ document.addEventListener("keydown", (event) => {
 });
 document.getElementById("logoutBtn").addEventListener("click", () => logout());
 
+document.getElementById("customizeBtn").addEventListener("click", () => {
+    setMenu(false);
+    openCustomize();
+});
+
 document.getElementById("deleteAccountBtn").addEventListener("click", () => {
     setMenu(false);
     const password = h("input", { class: "input", type: "password", id: "deletePassword", autocomplete: "current-password", required: true });
@@ -127,6 +133,7 @@ document.getElementById("deleteAccountBtn").addEventListener("click", () => {
             await api.deleteAccount(password.value);
             localStorage.removeItem("token");
             localStorage.removeItem("user");
+            localStorage.removeItem("theme");
             sessionStorage.setItem("authNotice", "Your account and all your books have been deleted.");
             location.replace("/login.html");
             return false; // keep the dialog up while the page changes
@@ -138,6 +145,8 @@ document.getElementById("deleteAccountBtn").addEventListener("click", () => {
 
 if (!location.hash || location.hash === "#/home" || location.hash === "#/stats") history.replaceState(null, "", "#/dashboard");
 render({ scroll: true });
+
+syncTheme();
 
 loadAll().catch((error) => {
     if (error.status === 401) return;

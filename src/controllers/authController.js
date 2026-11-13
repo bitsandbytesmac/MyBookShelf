@@ -1,6 +1,7 @@
 import pool from "../config/db.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { cleanTheme } from "./themeController.js";
 
 // Register a new user
 export async function registerUser(req, res) {
@@ -129,6 +130,7 @@ export async function loginUser(req, res) {
                 id: user.id,
                 username: user.username,
                 email: user.email,
+                theme: cleanTheme(user.theme),  // so the app opens in the user's look straight away
                 token
             }
         });

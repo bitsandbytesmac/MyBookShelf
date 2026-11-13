@@ -7,6 +7,7 @@ import googleBooksRoutes from "./src/routes/googleBooksRoutes.js";
 import uploadRoutes from "./src/routes/uploadRoutes.js";
 import activityRoutes from "./src/routes/activityRoutes.js";
 import goalRoutes from "./src/routes/goalRoutes.js";
+import themeRoutes from "./src/routes/themeRoutes.js";
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.use("/api/google-books", googleBooksRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/goals", goalRoutes);
+app.use("/api/theme", themeRoutes);
 
 // Start server locally
 if (process.env.NODE_ENV !== "production") {

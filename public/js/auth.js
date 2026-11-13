@@ -21,6 +21,9 @@ if (successNotice && noticeEl) {
 function storeSession(data) {
     localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify({ id: data.id, username: data.username, email: data.email }));
+    // Cache this account's look so the app opens in it without a flash (see theme-boot.js).
+    if (data.theme) localStorage.setItem("theme", JSON.stringify(data.theme));
+    else localStorage.removeItem("theme");
 }
 
 function setBusy(form, busy, label) {

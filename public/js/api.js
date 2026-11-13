@@ -152,6 +152,13 @@ export const api = {
         return (await request("/api/goals", { method: "PUT", body: goals })).data;
     },
 
+    async getTheme() {
+        return (await request("/api/theme")).data;
+    },
+    async updateTheme(theme) {
+        return (await request("/api/theme", { method: "PUT", body: { preset: theme.preset, background: theme.background } })).data;
+    },
+
     async searchGoogleBooks(query) {
         return (await request(`/api/google-books/search?q=${encodeURIComponent(query)}`, { auth: false })).data;
     },

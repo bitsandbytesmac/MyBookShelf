@@ -1,6 +1,7 @@
 import { state, percent, booksFinished, saveGoals } from "./store.js";
 import { h, icon, cover, progressBar, fmt, toast, attachTooltip } from "./ui.js";
 import { openAddBook } from "./dialogs.js";
+import { openCustomize } from "./theme.js";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -41,7 +42,9 @@ export function renderDashboard() {
         h("div", {},
             h("h1", {}, `${greeting()}${user.username ? `, ${user.username}` : ""}`),
             h("p", {}, books.length ? "Here's your reading life at a glance." : "Your shelf is waiting for its first book.")
-        )
+        ),
+        h("button", { class: "btn btn-ghost customize-btn", type: "button", onclick: openCustomize, "aria-label": "Customize colours" },
+            icon("palette"), h("span", { class: "label" }, "Customize"))
     );
 
     if (!books.length) {
@@ -234,8 +237,8 @@ function completionCard() {
 
     const ring = h("div", { class: "ring", role: "img", "aria-label": `Average completion ${avg}%` });
     ring.innerHTML = `<svg viewBox="0 0 120 120" aria-hidden="true">
-        <circle cx="60" cy="60" r="${radius}" fill="none" stroke="#e8efd9" stroke-width="12"/>
-        <circle cx="60" cy="60" r="${radius}" fill="none" stroke="#8EA66B" stroke-width="12" stroke-linecap="round"
+        <circle cx="60" cy="60" r="${radius}" fill="none" style="stroke: var(--sage-soft)" stroke-width="12"/>
+        <circle cx="60" cy="60" r="${radius}" fill="none" style="stroke: var(--sage)" stroke-width="12" stroke-linecap="round"
             stroke-dasharray="${circumference}" stroke-dashoffset="${circumference * (1 - avg / 100)}"/>
     </svg>`;
     ring.append(h("span", { class: "ring-value" }, `${avg}%`));
