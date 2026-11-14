@@ -78,6 +78,42 @@ export function cover(book, size = "md") {
     return wrap;
 }
 
+// ---------- Book Shelf (the Library's shelf view) ----------
+
+// One book standing on the shelf: its cover, a heart if it's a favourite, and a progress strip while reading.
+export function shelfBook(book) {
+    const reading = (book.status === "Reading" || book.status === "Paused") && book.totalPages;
+    const pct = reading ? Math.min(100, Math.round((book.currentPage / book.totalPages) * 100)) : 0;
+    const label = [
+        book.title, book.author, book.status,
+        reading ? `${pct}%` : null,
+        book.status === "Read" && book.dateFinished ? `finished ${fmt.date(book.dateFinished)}` : null
+    ].filter(Boolean).join(" · ");
+
+    const node = h("a", { class: "shelf-book", href: `#/book/${book.id}`, "aria-label": label, title: label }, cover(book, "sm"));
+    if (book.isFavorite) node.append(h("span", { class: "shelf-fav", "aria-hidden": "true" }, icon("heart", { filled: true })));
+    if (reading) node.append(h("span", { class: "shelf-progress", "aria-hidden": "true" }, h("span", { style: { width: `${pct}%` } })));
+    return node;
+}
+
+// Leafy vine with fairy lights across the top of the bookcase (decoration only, hidden from screen readers).
+function shelfVine() {
+    return h("div", { class: "shelf-vine", "aria-hidden": "true" },
+        h("span", { class: "vine-leaves" }),
+        h("span", { class: "vine-glow" }, h("span", { class: "vine-lights vine-lights-a" })),
+        h("span", { class: "vine-glow" }, h("span", { class: "vine-lights vine-lights-b" })));
+}
+
+// Wooden bookcase: a plank under every row of books.
+export function bookcase(books, emptyText = "Nothing on this shelf yet.") {
+    return h("div", { class: `bookcase${books.length ? "" : " is-empty"}` },
+        shelfVine(),
+        books.length
+            ? h("div", { class: "shelf", role: "list", "aria-label": "Book Shelf" },
+                books.map((b) => h("div", { role: "listitem", class: "shelf-slot" }, shelfBook(b))))
+            : h("div", { class: "shelf shelf-empty" }, h("p", {}, emptyText)));
+}
+
 export function progressBar(value, { thin = false } = {}) {
     return h("div", { class: `progress${thin ? " progress-thin" : ""}`, role: "progressbar", "aria-valuenow": value, "aria-valuemin": 0, "aria-valuemax": 100 },
         h("span", { style: { width: `${value}%` } })

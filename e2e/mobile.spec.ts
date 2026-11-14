@@ -1,9 +1,9 @@
 import { test, expect, today } from "./fixtures";
 
 // Runs in the "mobile" project (Pixel 7 viewport): every page must fit the screen width,
-// and the five tabs must fit in the bottom bar.
+// and the six tabs must fit in the bottom bar.
 
-test("pages fit a phone screen and the bottom nav shows all five tabs", async ({ page, api }) => {
+test("pages fit a phone screen and the bottom nav shows all six tabs", async ({ page, api }) => {
     const book = await api.createBook({
         title: "A Very Long Title That Keeps Going To Test Wrapping On Small Screens",
         series: "Narrow Saga", seriesNumber: 1, seriesTotal: 4, genres: ["Science Fiction", "Literary Fiction"],
@@ -13,7 +13,7 @@ test("pages fit a phone screen and the bottom nav shows all five tabs", async ({
         { label: "A" }, { label: "A book with an extremely long prompt that should wrap neatly", bookId: book.id }
     ]);
 
-    const routes = ["#/dashboard", "#/library", `#/book/${book.id}`, "#/series", "#/series/Narrow%20Saga", "#/challenges", `#/challenges/${challenge.id}`];
+    const routes = ["#/dashboard", "#/library", `#/book/${book.id}`, "#/series", "#/series/Narrow%20Saga", "#/challenges", `#/challenges/${challenge.id}`, "#/statistics"];
     for (const route of routes) {
         await page.goto(`/index.html${route}`);
         await expect(page.locator("#view > *").first()).toBeVisible();
@@ -23,7 +23,7 @@ test("pages fit a phone screen and the bottom nav shows all five tabs", async ({
     }
 
     const tabs = page.locator("nav.tabs .tab");
-    await expect(tabs).toHaveText(["Dashboard", "Library", "Authors", "Series", "Challenges"]);
+    await expect(tabs).toHaveText(["Dashboard", "Library", "Authors", "Series", "Challenges", "Statistics"]);
     for (const tab of await tabs.all()) {
         const box = await tab.boundingBox();
         expect(box!.x).toBeGreaterThanOrEqual(0);

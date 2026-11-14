@@ -1,12 +1,14 @@
 // App entry: routing, nav, account menu, initial load.
 import { api, logout } from "./api.js";
-import { loadAll, subscribe } from "./store.js";
+import { loadAll, subscribe, state } from "./store.js";
+import { openLogReading } from "./logReading.js";
 import { renderDashboard, currentUser } from "./dashboard.js";
 import { renderLibrary } from "./library.js";
 import { renderBookPage } from "./bookPage.js";
 import { renderAuthors, renderAuthor } from "./authors.js";
 import { renderSeries } from "./series.js";
 import { renderChallenges } from "./challenges.js";
+import { renderStatistics } from "./statistics.js";
 import { openAddBook } from "./dialogs.js";
 import { h, modal, toast } from "./ui.js";
 import { openCustomize, syncTheme } from "./theme.js";
@@ -20,7 +22,8 @@ const ROUTES = {
     authors: { render: renderAuthors, title: () => "Authors", tab: "authors" },
     author: { render: renderAuthor, title: () => document.querySelector(".author-hero h1")?.textContent || "Author", tab: "authors" },
     series: { render: renderSeries, title: () => document.querySelector(".series-hero h1")?.textContent || "Series", tab: "series" },
-    challenges: { render: renderChallenges, title: () => document.querySelector(".board-title")?.textContent || "Challenges", tab: "challenges" }
+    challenges: { render: renderChallenges, title: () => document.querySelector(".board-title")?.textContent || "Challenges", tab: "challenges" },
+    statistics: { render: renderStatistics, title: () => "Statistics", tab: "statistics" }
 };
 
 let currentKey = null;
@@ -73,14 +76,21 @@ subscribe(() => render());
 // ---------- Nav actions ----------
 
 document.querySelectorAll("[data-action='add-book']").forEach((btn) => btn.addEventListener("click", openAddBook));
+document.querySelectorAll("[data-action='log-reading']").forEach((btn) => btn.addEventListener("click", () => {
+    if (!state.loaded) return toast("Your shelf is still loading…");
+    openLogReading();
+}));
 
-// "n" adds a book from anywhere (outside text fields).
+// "n" adds a book and "l" logs your reading, from anywhere (outside text fields).
 document.addEventListener("keydown", (event) => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.target.closest("input, textarea, select, dialog[open]")) return;
     if (event.key === "n") {
         event.preventDefault();
         openAddBook();
+    } else if (event.key === "l" && state.loaded) {
+        event.preventDefault();
+        openLogReading();
     }
 });
 
@@ -149,7 +159,8 @@ document.getElementById("deleteAccountBtn").addEventListener("click", () => {
 
 // ---------- Boot ----------
 
-if (!location.hash || location.hash === "#/home" || location.hash === "#/stats") history.replaceState(null, "", "#/dashboard");
+if (!location.hash || location.hash === "#/home") history.replaceState(null, "", "#/dashboard");
+if (location.hash === "#/stats") history.replaceState(null, "", "#/statistics"); // old link
 render({ scroll: true });
 
 syncTheme();

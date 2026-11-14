@@ -153,8 +153,10 @@ export const api = {
     async createBook(book) {
         return normalizeBook((await request("/api/books", { method: "POST", body: toPayload(book) })).data);
     },
-    async updateBook(id, book) {
-        return normalizeBook((await request(`/api/books/${encodeURIComponent(id)}`, { method: "PUT", body: toPayload(book) })).data);
+    // session (optional): { date: "YYYY-MM-DD", note } - a "Log your reading" journal entry saved with the update.
+    async updateBook(id, book, session = null) {
+        const body = { ...toPayload(book), ...(session ? { sessionDate: session.date || null, sessionNote: session.note || null } : {}) };
+        return normalizeBook((await request(`/api/books/${encodeURIComponent(id)}`, { method: "PUT", body })).data);
     },
     deleteBook: (id) => request(`/api/books/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
@@ -182,6 +184,13 @@ export const api = {
         return (await request(`/api/goals/custom/${encodeURIComponent(id)}`, { method: "PUT", body: goal })).data;
     },
     deleteCustomGoal: (id) => request(`/api/goals/custom/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+    async getNextUp() {
+        return (await request("/api/next-up")).data.bookIds;
+    },
+    async updateNextUp(bookIds) {
+        return (await request("/api/next-up", { method: "PUT", body: { bookIds } })).data.bookIds;
+    },
 
     async getChallenges() {
         return (await request("/api/challenges")).data;

@@ -44,6 +44,7 @@ export const state = {
     goals: { monthlyGoal: 2, yearlyGoal: 12 },
     customGoals: [],
     challenges: [],
+    nextUp: [],          // book ids picked for "Next Up" (max 3)
     loaded: false
 };
 
@@ -71,13 +72,15 @@ export function genreOptions(kind = "genres") {
 // ---------- Loading ----------
 
 export async function loadAll() {
-    const [books, goals, customGoals, challenges] = await Promise.all([
+    const [books, goals, customGoals, challenges, nextUp] = await Promise.all([
         api.getBooks(),
         api.getGoals().catch(() => null),
         api.getCustomGoals().catch(() => []),
         api.getChallenges().catch(() => []),
+        api.getNextUp().catch(() => []),
         refreshActivity({ silent: true })
     ]);
+    state.nextUp = nextUp;
     // The nav's "Add book" works before this finishes; on a slow connection a book can be saved while
     // the list was still on its way. That response predates it, so keep it instead of dropping it.
     const fetched = new Set(books.map((b) => b.id));
@@ -168,18 +171,19 @@ export async function createBook(data) {
     return saved;
 }
 
-export async function updateBook(id, changes) {
+// session (optional): { date, note } - saves a "Log your reading" journal entry along with the change.
+export async function updateBook(id, changes, { session = null } = {}) {
     const current = getBook(id);
     if (!current) throw new Error("Book not found.");
 
     const previousPage = current.currentPage;
     const next = applyReadingRules({ ...current, ...changes }, current);
-    const saved = await api.updateBook(id, next);
+    const saved = await api.updateBook(id, next, session);
     Object.assign(current, saved);
     syncSeriesTotal(saved);
 
     // The server logs a reading session whenever the page count goes up.
-    if (saved.currentPage > previousPage) await refreshActivity({ silent: true });
+    if (saved.currentPage > previousPage || session?.note) await refreshActivity({ silent: true });
 
     emit();
     return current;
@@ -252,6 +256,42 @@ export function challengeProgress(challenge) {
 }
 
 // ---------- Derived ----------
+
+// ---------- Next Up ----------
+
+export const NEXT_UP_MAX = 3;
+
+// The picked books that are still To Be Read (once started, a book leaves Next Up by itself).
+export function nextUpBooks() {
+    return state.nextUp.map(getBook).filter((b) => b && b.status === "To Be Read");
+}
+
+export async function saveNextUp(bookIds) {
+    state.nextUp = await api.updateNextUp(bookIds.slice(0, NEXT_UP_MAX));
+    emit();
+}
+
+// ---------- Reading streak (from the days with a logged session) ----------
+
+function dayString(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function readingDays() {
+    return new Set(state.statistics?.readingDays || []);
+}
+
+// Consecutive days with a session, ending today. If today has none yet, the streak from yesterday still counts.
+export function readingStreak(days = readingDays()) {
+    const d = new Date();
+    if (!days.has(dayString(d))) d.setDate(d.getDate() - 1);
+    let streak = 0;
+    while (days.has(dayString(d))) {
+        streak++;
+        d.setDate(d.getDate() - 1);
+    }
+    return streak;
+}
 
 export function booksFinished({ year, month } = {}) {
     return state.books.filter((b) => {

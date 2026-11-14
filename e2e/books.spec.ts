@@ -52,7 +52,7 @@ test.describe("Books", () => {
         release(); // the stale, empty list arrives after the book was added
         await expect(page.getByRole("heading", { level: 1, name: "Early Bird" })).toBeVisible();
         await page.getByRole("link", { name: "Library" }).first().click();
-        await expect(page.locator(".book-tile", { hasText: "Early Bird" })).toHaveCount(1);
+        await expect(page.locator(".bookcase").getByRole("link", { name: /^Early Bird/ })).toHaveCount(1);
     });
 
     test("edit details saves age category, tropes, content warnings and series total", async ({ page, api }) => {

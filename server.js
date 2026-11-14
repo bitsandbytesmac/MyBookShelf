@@ -9,6 +9,7 @@ import activityRoutes from "./src/routes/activityRoutes.js";
 import goalRoutes from "./src/routes/goalRoutes.js";
 import themeRoutes from "./src/routes/themeRoutes.js";
 import challengeRoutes from "./src/routes/challengeRoutes.js";
+import nextUpRoutes from "./src/routes/nextUpRoutes.js";
 import { sameOriginOnly } from "./src/utils/session.js";
 
 dotenv.config();
@@ -74,6 +75,7 @@ app.use("/api/activities", activityRoutes);
 app.use("/api/goals", goalRoutes);
 app.use("/api/theme", themeRoutes);
 app.use("/api/challenges", challengeRoutes);
+app.use("/api/next-up", nextUpRoutes);
 
 // Start server locally
 if (process.env.NODE_ENV !== "production") {

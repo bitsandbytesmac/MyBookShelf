@@ -3,6 +3,7 @@ import { state, getBook, updateBook, deleteBook, percent, STATUSES, authorNames 
 import { h, icon, cover, progressBar, statusBadge, stars, chilis, fmt, toast, confirmDialog, authorHref, seriesHref, seriesLabel } from "./ui.js";
 import { openEditBook, openReview } from "./dialogs.js";
 import { loadingSkeleton } from "./dashboard.js";
+import { openLogReading } from "./logReading.js";
 
 // Notes drafts survive re-renders while typing.
 const noteDrafts = new Map();
@@ -120,56 +121,39 @@ function progressCard(book) {
             h("p", { class: "sub" }, "Add the total number of pages to track your progress."),
             h("button", { class: "btn btn-sm", type: "button", style: { marginTop: "14px" }, onclick: () => openEditBook(book) }, "Add page count")
         );
-        return card;
+    } else {
+        card.append(
+            h("div", { class: "session-progress" },
+                h("span", { class: "pct" }, `${pct}%`),
+                h("span", { class: "pages" }, `Page ${fmt.num(book.currentPage)} of ${fmt.num(book.totalPages)}`)
+            ),
+            progressBar(pct)
+        );
     }
 
-    card.append(
-        h("div", { class: "session-progress" },
-            h("span", { class: "pct" }, `${pct}%`),
-            h("span", { class: "pages" }, `Page ${fmt.num(book.currentPage)} of ${fmt.num(book.totalPages)}`)
-        ),
-        progressBar(pct)
-    );
-
     if (book.status !== "Read") {
-        const input = h("input", {
-            class: "input", type: "number", min: 0, max: book.totalPages, inputmode: "numeric",
-            value: book.currentPage || "", placeholder: "Page", "aria-label": "Page I'm on", id: "sessionPage"
-        });
-        const form = h("form", { class: "session-form" },
-            h("label", { for: "sessionPage" }, "I'm on page"), input, h("span", {}, `of ${fmt.num(book.totalPages)}`),
-            h("button", { class: "btn btn-sage", type: "submit" }, "Update")
-        );
-        form.addEventListener("submit", (event) => {
-            event.preventDefault();
-            const page = Number(input.value);
-            if (!Number.isInteger(page) || page < 0 || page > book.totalPages) {
-                toast(`Enter a page between 0 and ${book.totalPages}.`, { error: true });
-                return;
-            }
-            if (page === book.currentPage) return;
-            const delta = page - book.currentPage;
-            run(() => updateBook(book.id, { currentPage: page }),
-                page >= book.totalPages ? "Finished! Time to write your review 🎉"
-                    : delta > 0 ? `+${fmt.plural(delta, "page")} — ${Math.round((page / book.totalPages) * 100)}%` : "Progress updated");
-        });
-        card.append(form);
+        // Same "Log your reading" window as the dashboard and the top bar.
+        card.append(h("button", { class: "btn btn-sage session-log", type: "button", onclick: () => openLogReading(book.id) },
+            icon("pen"), "Log your reading"));
     } else if (book.dateFinished) {
         card.append(h("p", { class: "sub", style: { marginTop: "12px" } }, `Finished ${fmt.date(book.dateFinished)}`));
     }
 
-    const sessions = state.activities.filter((a) => String(a.book_id) === book.id).slice(0, 5);
-    if (sessions.length) {
-        card.append(
-            h("ul", { class: "sessions", "aria-label": "Recent reading sessions" }, sessions.map((a) =>
-                h("li", {},
-                    h("span", {}, `${fmt.relative(a.created_at)} · p. ${a.previous_page} → ${a.current_page}`),
-                    h("strong", {}, `+${a.pages_read}`)
-                )
-            ))
-        );
-    }
+    card.append(journalList(book));
     return card;
+}
+
+// This book's journal entries: date, pages read and the note.
+function journalList(book) {
+    const sessions = state.activities.filter((a) => String(a.book_id) === book.id).slice(0, 6);
+    if (!sessions.length) return h("p", { class: "hint session-empty" }, "No journal entries yet.");
+    return h("ul", { class: "sessions", "aria-label": "Journal entries" }, sessions.map((a) =>
+        h("li", {},
+            h("span", { class: "session-line" },
+                h("span", {}, `${fmt.date(a.session_date || a.created_at)}${a.pages_read > 0 ? ` · p. ${a.previous_page} → ${a.current_page}` : ""}`),
+                h("strong", {}, a.pages_read > 0 ? `+${a.pages_read}` : "Note")),
+            a.note ? h("span", { class: "session-note" }, a.note) : null)
+    ));
 }
 
 // ---------- Review ----------
@@ -209,8 +193,11 @@ function reviewCard(book) {
             h("div", {}, h("span", { class: "label" }, "Started"), h("span", {}, book.dateStarted ? fmt.date(book.dateStarted) : "—")),
             h("div", {}, h("span", { class: "label" }, "Finished"), h("span", {}, book.dateFinished ? fmt.date(book.dateFinished) : "—"))
         ),
-        book.review ? h("p", { class: "review-text" }, book.review) : null,
-        book.quotes.length ? h("div", { class: "review-quotes" }, book.quotes.map((q) => h("blockquote", {}, q))) : null
+        // Element.append() would print a null as the text "null", so only pass real nodes.
+        ...[
+            book.review ? h("p", { class: "review-text" }, book.review) : null,
+            book.quotes.length ? h("div", { class: "review-quotes" }, book.quotes.map((q) => h("blockquote", {}, q))) : null
+        ].filter(Boolean)
     );
     return card;
 }

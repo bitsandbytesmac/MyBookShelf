@@ -1,6 +1,6 @@
 import pool from "../config/db.js";
 
-// GET - Retrieve reading activities belonging to the authenticated user
+// GET - the user's latest reading sessions (journal entries), newest day first
 export async function getReadingActivities(req, res) {
     try {
         const activities = await pool.query(
@@ -11,11 +11,13 @@ export async function getReadingActivities(req, res) {
                 previous_page,
                 current_page,
                 pages_read,
+                session_date,
+                note,
                 created_at
              FROM reading_activities
              WHERE user_id = $1
-             ORDER BY created_at DESC
-             LIMIT 20`,
+             ORDER BY session_date DESC, created_at DESC
+             LIMIT 30`,
             [req.user.id]
         );
 
@@ -40,19 +42,9 @@ export async function getReadingStatistics(req, res) {
     try {
         const statistics = await pool.query(
             `SELECT
-                COALESCE(SUM(pages_read) FILTER (
-                    WHERE created_at >= CURRENT_DATE
-                    AND created_at < CURRENT_DATE + INTERVAL '1 day'
-                ), 0) AS pages_today,
-
-                COALESCE(SUM(pages_read) FILTER (
-                    WHERE created_at >= DATE_TRUNC('week', CURRENT_DATE)
-                ), 0) AS pages_this_week,
-
-                COALESCE(SUM(pages_read) FILTER (
-                    WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
-                ), 0) AS pages_this_month
-
+                COALESCE(SUM(pages_read) FILTER (WHERE session_date = CURRENT_DATE), 0) AS pages_today,
+                COALESCE(SUM(pages_read) FILTER (WHERE session_date >= DATE_TRUNC('week', CURRENT_DATE)), 0) AS pages_this_week,
+                COALESCE(SUM(pages_read) FILTER (WHERE session_date >= DATE_TRUNC('month', CURRENT_DATE)), 0) AS pages_this_month
              FROM reading_activities
              WHERE user_id = $1`,
             [req.user.id]
@@ -70,6 +62,15 @@ export async function getReadingStatistics(req, res) {
             [req.user.id]
         );
 
+        // Every day with a session in the last ~13 months: the dashboard's streak and calendar.
+        const days = await pool.query(
+            `SELECT DISTINCT session_date
+             FROM reading_activities
+             WHERE user_id = $1 AND session_date >= CURRENT_DATE - 400
+             ORDER BY session_date DESC`,
+            [req.user.id]
+        );
+
         res.json({
             message: "Reading statistics retrieved successfully!",
             status: "success",
@@ -77,7 +78,8 @@ export async function getReadingStatistics(req, res) {
                 pagesToday: Number(statistics.rows[0].pages_today),
                 pagesThisWeek: Number(statistics.rows[0].pages_this_week),
                 pagesThisMonth: Number(statistics.rows[0].pages_this_month),
-                mostReadBook: mostReadBook.rows[0] || null
+                mostReadBook: mostReadBook.rows[0] || null,
+                readingDays: days.rows.map((r) => r.session_date)
             }
         });
 

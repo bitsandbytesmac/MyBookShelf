@@ -199,10 +199,25 @@ export async function addBook(req, res) {
     }
 }
 
+// Optional journal entry sent with a book update by "Log your reading": the day it happened and a note.
+// Returns { date, note } (both may be null) or { error }.
+function parseSession(body = {}) {
+    const date = optionalDate(body.sessionDate, "Session date");
+    if (date.error) return { error: date.error };
+    // A day of slack for time zones ahead of the server.
+    const latest = new Date(Date.now() + 36 * 3600 * 1000).toISOString().slice(0, 10);
+    if (date.value && date.value > latest) return { error: "The reading date can't be in the future." };
+    const note = optionalText(body.sessionNote, LIMITS.longText, "Note");
+    if (note.error) return { error: note.error };
+    return { date: date.value, note: note.value };
+}
+
 // PUT - replace a book's details (the client always sends the full book)
 export async function updateBook(req, res) {
     const { values, error } = parseBook(req.body);
     if (error) return sendError(res, 400, error);
+    const session = parseSession(req.body);
+    if (session.error) return sendError(res, 400, session.error);
 
     let client;
 
@@ -231,12 +246,13 @@ export async function updateBook(req, res) {
             params
         );
 
-        // Log a reading session whenever the page count goes up.
-        if (values.current_page > previousPage) {
+        // Log a reading session (journal entry) whenever the page count goes up, or a note was written.
+        if (values.current_page > previousPage || session.note) {
             await client.query(
-                `INSERT INTO reading_activities (user_id, book_id, book_title, previous_page, current_page, pages_read)
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [req.user.id, req.params.id, values.title, previousPage, values.current_page, values.current_page - previousPage]
+                `INSERT INTO reading_activities (user_id, book_id, book_title, previous_page, current_page, pages_read, session_date, note)
+                 VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, CURRENT_DATE), $8)`,
+                [req.user.id, req.params.id, values.title, previousPage, values.current_page,
+                    Math.max(0, values.current_page - previousPage), session.date, session.note]
             );
         }
 

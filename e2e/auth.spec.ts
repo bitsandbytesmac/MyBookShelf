@@ -17,6 +17,8 @@ test.describe("Accounts", () => {
         await page.getByRole("button", { name: "Account menu" }).click();
         await page.getByRole("menuitem", { name: "Log out" }).click();
         await expect(page).toHaveURL(/login\.html/);
+        // The URL changes before the page's script has run; a click before then just reloads the form.
+        await page.waitForLoadState("domcontentloaded");
 
         await page.locator("#email").fill(email.toUpperCase()); // emails are case-insensitive
         await page.locator("#password").fill(password);

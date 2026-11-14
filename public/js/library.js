@@ -1,7 +1,19 @@
 import { state, percent, STATUSES, FORMATS, bySeriesOrder } from "./store.js";
-import { h, icon, cover, progressBar, statusBadge, stars, fmt, seriesLabel } from "./ui.js";
+import { h, icon, cover, progressBar, statusBadge, stars, fmt, seriesLabel, bookcase } from "./ui.js";
 import { openAddBook } from "./dialogs.js";
 import { loadingSkeleton } from "./dashboard.js";
+
+// Shelf (covers standing on wooden shelves) is the default; Grid shows titles, status and progress.
+// The choice is a per-browser convenience, so it lives in localStorage (and falls back to Shelf).
+const VIEW_KEY = "libraryView";
+function savedView() {
+    try {
+        return localStorage.getItem(VIEW_KEY) === "grid" ? "grid" : "shelf";
+    } catch {
+        return "shelf";
+    }
+}
+let view = savedView();
 
 const SORTS = {
     recent: { label: "Recently added", fn: (a, b) => Number(b.id) - Number(a.id) },
@@ -79,7 +91,8 @@ export function renderLibrary(params) {
                 })),
             select("Genre", "genre", [["All", "All genres"], ...allGenres.map((g) => [g, g])]),
             select("Format", "format", [["All", "All formats"], ...FORMATS.map((f) => [f, f])]),
-            select("Sort", "sort", Object.entries(SORTS).map(([k, s]) => [k, s.label]))
+            select("Sort", "sort", Object.entries(SORTS).map(([k, s]) => [k, s.label])),
+            viewSwitch(update)
         ),
         results
     );
@@ -110,8 +123,28 @@ function renderResults() {
 
     return [
         h("p", { class: "result-count" }, fmt.plural(list.length, "book")),
-        h("div", { class: "book-grid" }, list.map(bookTile))
+        view === "shelf" ? bookcase(list) : h("div", { class: "book-grid" }, list.map(bookTile))
     ];
+}
+
+function viewSwitch(update) {
+    const wrap = h("div", { class: "view-switch", role: "group", "aria-label": "Library view" });
+    const option = (value, label, iconName) => h("button", {
+        type: "button", "aria-pressed": String(view === value),
+        onclick: () => {
+            view = value;
+            try {
+                localStorage.setItem(VIEW_KEY, value);
+            } catch {
+                /* private mode: just don't remember it */
+            }
+            wrap.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === value)));
+            update();
+        },
+        dataset: { view: value }
+    }, icon(iconName), label);
+    wrap.append(option("shelf", "Shelf", "book"), option("grid", "Grid", "layers"));
+    return wrap;
 }
 
 export function bookTile(book) {
