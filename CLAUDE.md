@@ -13,7 +13,9 @@ npm run migrate           # apply pending migrations/*.sql (local DB, or Neon if
 node testGoogleBooks.js   # sanity-check GOOGLE_BOOKS_API_KEY
 ```
 
-There is no test runner, linter or bundler. Check syntax with `node --check <file>`; verify behaviour by running the server and driving it in a browser.
+There is no linter or bundler. Check syntax with `node --check <file>`.
+
+End-to-end tests: Playwright + TypeScript in `e2e/` (`npm run test:e2e`, `npm run typecheck:e2e`, `npm run test:e2e:report`). The config starts its own server on port 3210 against the **local** database and refuses to run if `DATABASE_URL` is set. Each test signs up a throwaway `@example.test` account and deletes it afterwards. To shake out races, run `npx playwright test --repeat-each=5 --workers=8`.
 
 Running migrations against production (PowerShell). The owner runs these, not Claude. Before running, take a Neon snapshot branch (Neon console > Branches > Create branch from `main`). Delete the snapshot about a week later if nothing went wrong. If something breaks, fix it forward with a new migration; restore the snapshot only if real data was lost.
 ```powershell
@@ -38,6 +40,7 @@ $env:DATABASE_URL = "<neon connection string>"; npm run migrate; Remove-Item Env
 - `routes/*` -> `controllers/*` -> `pool` from `config/db.js`. Responses are `{ status, message, data }`. Unknown `/api` routes get JSON 404; a central error handler turns Multer errors into 400s.
 - `config/db.js` sets a pg type parser so `DATE` columns come back as `"YYYY-MM-DD"` strings (prevents off-by-one-day bugs).
 - **Migrations**: `scripts/migrate.js` applies `migrations/NNN_*.sql` in filename order, each in a transaction, recorded in `schema_migrations`. Add a new numbered file; never edit an applied one.
+- **IDs**: every table's `id` comes from a database sequence (`users`/`books` since migration 008; they used to be `Date.now()`, which collided). Never set `id` in an INSERT.
 - **Auth/session**: login sets an HttpOnly JWT cookie (`utils/session.js`; `__Host-mbs_session` in production, `mbs_session` locally). The token carries `tv` (session version). `middleware/authMiddleware.js` checks it against `users.token_version`; a password reset increments that column, which signs the user out everywhere. `sameOriginOnly` rejects cross-site POST/PUT/PATCH/DELETE (CSRF). Emails are stored lower-case and compared case-insensitively.
 - **401 has a side effect**: the frontend treats any 401 as "session over" and logs out. Use 400 for things like a wrong password on account deletion.
 - **Books**: `bookController.parseBook` validates every field and maps camelCase input to snake_case columns (`COLUMNS`). `PUT /api/books/:id` is a **full replacement**, so the client must send every field. An increased `current_page` inserts a `reading_activities` row. `genre` and `completed_at` are legacy columns kept in sync.

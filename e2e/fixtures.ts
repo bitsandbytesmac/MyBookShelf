@@ -64,7 +64,10 @@ export async function signUpViaApi(request: APIRequestContext, page: Page): Prom
 }
 
 export async function deleteAccount(request: APIRequestContext, password: string) {
-    const response = await request.delete("/api/auth/account", { data: { password } });
+    // Under heavy parallel load a reused keep-alive socket can be reset by the server just as it times
+    // out (ECONNRESET). That's a transport hiccup, not an app failure, so clean-up retries once.
+    const send = () => request.delete("/api/auth/account", { data: { password } });
+    const response = await send().catch(send);
     // 401 just means the test already signed out or deleted the account.
     expect([200, 401]).toContain(response.status());
 }

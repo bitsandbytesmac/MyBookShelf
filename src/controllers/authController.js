@@ -40,13 +40,12 @@ export async function registerUser(req, res) {
         // Hash the password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Save user in PostgreSQL
+        // Save user in PostgreSQL (the id comes from users_id_seq, see migration 008)
         const newUser = await pool.query(
-            `INSERT INTO users (id, username, email, password)
-             VALUES ($1, $2, $3, $4)
+            `INSERT INTO users (username, email, password)
+             VALUES ($1, $2, $3)
              RETURNING id, username, email, created_at`,
             [
-                Date.now(),
                 username,
                 email,
                 hashedPassword
@@ -61,21 +60,15 @@ export async function registerUser(req, res) {
 
     } catch (error) {
 
-    // Handle duplicate username or email.
-    if (error.code === "23505") {
-
-        let message = "Username or email already exists.";
-
-        if (error.constraint === "users_username_key") {
-            message = "Username already exists. Please choose another.";
-        }
-
-        if (error.constraint === "users_email_key") {
-            message = "Email already exists. Please use another email.";
-        }
-
+    // Handle duplicate username or email. Any other clash is a server problem, not the user's,
+    // so it falls through to the 500 below instead of a misleading "already exists".
+    const DUPLICATE_MESSAGES = {
+        users_username_key: "Username already exists. Please choose another.",
+        users_email_key: "Email already exists. Please use another email."
+    };
+    if (error.code === "23505" && DUPLICATE_MESSAGES[error.constraint]) {
         return res.status(409).json({
-            message,
+            message: DUPLICATE_MESSAGES[error.constraint],
             status: "error"
         });
     }

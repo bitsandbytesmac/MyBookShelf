@@ -24,6 +24,37 @@ test.describe("Books", () => {
         await expect(page.getByRole("heading", { level: 1, name: "The Manual Book" })).toBeVisible();
     });
 
+    test("a book added while the shelf is still loading isn't lost when the load finishes", async ({ page, account }) => {
+        void account;
+        // Hold the first GET /api/books until the new book has been saved (a slow connection).
+        let release!: () => void;
+        const held = new Promise<void>((resolve) => (release = resolve));
+        let first = true;
+        await page.route("**/api/books", async (route) => {
+            if (route.request().method() === "GET" && first) {
+                first = false;
+                const response = await route.fetch(); // fetched now: the shelf is still empty
+                await held;
+                return route.fulfill({ response });
+            }
+            return route.continue();
+        });
+
+        await page.goto("/index.html#/library");
+        await page.locator("[data-action='add-book']").click(); // the nav button works before the shelf has loaded
+        await dialog(page, "Add a book").getByRole("button", { name: "Can't find it? Add manually" }).click();
+        const add = dialog(page, "Add a book manually");
+        await add.getByLabel("Title").fill("Early Bird");
+        await add.getByLabel("Author").fill("Quick Reader");
+        await add.getByRole("button", { name: "Add to To Be Read" }).click();
+        await expect(page).toHaveURL(/#\/book\/\d+/);
+
+        release(); // the stale, empty list arrives after the book was added
+        await expect(page.getByRole("heading", { level: 1, name: "Early Bird" })).toBeVisible();
+        await page.getByRole("link", { name: "Library" }).first().click();
+        await expect(page.locator(".book-tile", { hasText: "Early Bird" })).toHaveCount(1);
+    });
+
     test("edit details saves age category, tropes, content warnings and series total", async ({ page, api }) => {
         const book = await api.createBook({ title: "Thorns", series: "Court", seriesNumber: 1, totalPages: 400 });
         await page.goto(`/index.html#/book/${book.id}`);

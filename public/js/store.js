@@ -78,7 +78,10 @@ export async function loadAll() {
         api.getChallenges().catch(() => []),
         refreshActivity({ silent: true })
     ]);
-    state.books = books;
+    // The nav's "Add book" works before this finishes; on a slow connection a book can be saved while
+    // the list was still on its way. That response predates it, so keep it instead of dropping it.
+    const fetched = new Set(books.map((b) => b.id));
+    state.books = [...state.books.filter((b) => !fetched.has(b.id)), ...books];
     if (goals) state.goals = goals;
     state.customGoals = customGoals;
     state.challenges = challenges;

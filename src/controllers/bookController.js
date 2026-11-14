@@ -177,8 +177,9 @@ export async function addBook(req, res) {
         client = await pool.connect();
         await client.query("BEGIN");
 
-        const columns = ["id", "user_id", ...COLUMNS];
-        const params = [Date.now(), req.user.id, ...COLUMNS.map((c) => values[c])];
+        // The id comes from books_id_seq (migration 008).
+        const columns = ["user_id", ...COLUMNS];
+        const params = [req.user.id, ...COLUMNS.map((c) => values[c])];
         const placeholders = params.map((_, i) => `$${i + 1}`).join(", ");
 
         const result = await client.query(

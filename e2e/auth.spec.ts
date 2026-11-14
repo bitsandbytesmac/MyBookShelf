@@ -20,7 +20,11 @@ test.describe("Accounts", () => {
 
         await page.locator("#email").fill(email.toUpperCase()); // emails are case-insensitive
         await page.locator("#password").fill(password);
+        const loginResponse = page.waitForResponse("**/api/auth/login");
         await page.getByRole("button", { name: "Log in" }).click();
+        const login = await loginResponse;
+        // (Only read the body on failure: on success the page navigates away and the body is gone.)
+        expect(login.ok(), login.ok() ? "" : `login: ${login.status()} ${await login.text()}`).toBeTruthy();
         await expect(page.getByRole("heading", { level: 1 })).toContainText("UI Reader");
 
         // Something in the new tables, so deleting the account has to clean them up too.

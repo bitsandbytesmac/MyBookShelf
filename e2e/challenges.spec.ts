@@ -188,8 +188,10 @@ test.describe("Challenges", () => {
         const other = await browser.newContext({ baseURL: test.info().project.use.baseURL });
         const email = `e2e-other${Date.now()}@example.test`;
         const password = "E2e-test-pass-123";
-        await other.request.post("/api/auth/register", { data: { username: `Other ${Date.now()}`, email, password } });
-        await other.request.post("/api/auth/login", { data: { email, password } });
+        const registered = await other.request.post("/api/auth/register", { data: { username: `Other ${Date.now()}`, email, password } });
+        expect(registered.ok(), `register: ${registered.status()} ${await registered.text()}`).toBeTruthy();
+        const loggedIn = await other.request.post("/api/auth/login", { data: { email, password } });
+        expect(loggedIn.ok(), `login: ${loggedIn.status()} ${await loggedIn.text()}`).toBeTruthy();
 
         expect((await (await other.request.get("/api/challenges")).json()).data).toEqual([]);
         expect((await other.request.put(`/api/challenges/${mine.id}`, { data: { name: "Hacked", items: [{ label: "x" }] } })).status()).toBe(404);
