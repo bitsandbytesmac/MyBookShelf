@@ -1,6 +1,6 @@
 // Book cover storage on Vercel Blob.
 import crypto from "node:crypto";
-import { put, del, list } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 
 export const MAX_COVER_BYTES = 4 * 1024 * 1024; // stays under Vercel's 4.5 MB request limit
 
@@ -61,23 +61,15 @@ export function isOwnedCover(url, userId) {
 
 // Delete covers that a book no longer uses (replaced, or the book was deleted). Never throws.
 // Anything that isn't this user's own Blob file (Google covers, old links) is left alone.
+// Uses only del(), which Vercel Blob doesn't bill as an operation; never list() (a paid "advanced operation").
 export async function deleteUnusedCovers(urls, userId) {
-    const blobs = urls.filter((u) => u && isOwnedCover(u, userId));
+    const blobs = [...new Set(urls.filter((u) => u && isOwnedCover(u, userId)))];
     if (!blobs.length || !blobConfigured()) return;
-    try {
-        await del(blobs);
-    } catch (error) {
-        console.error("Couldn't delete old cover image(s):", error.message);
+    for (let i = 0; i < blobs.length; i += 100) {
+        try {
+            await del(blobs.slice(i, i + 100));
+        } catch (error) {
+            console.error("Couldn't delete old cover image(s):", error.message);
+        }
     }
-}
-
-// Delete every cover in this user's folder (account deletion), including uploads that were never saved to a book.
-export async function deleteAllCoversForUser(userId) {
-    if (!blobConfigured()) return;
-    let cursor;
-    do {
-        const page = await list({ prefix: userPrefix(userId), cursor, limit: 1000 });
-        if (page.blobs.length) await del(page.blobs.map((b) => b.url));
-        cursor = page.hasMore ? page.cursor : undefined;
-    } while (cursor);
 }

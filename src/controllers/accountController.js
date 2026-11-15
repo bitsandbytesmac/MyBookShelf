@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import pool from "../config/db.js";
 import { clearSessionCookie } from "../utils/session.js";
-import { deleteAllCoversForUser } from "../services/coverStorage.js";
+import { deleteUnusedCovers } from "../services/coverStorage.js";
 
 // DELETE /api/auth/account  { password }
 // Permanently removes the signed-in user, their books, activity, reset links and uploaded covers.
@@ -14,6 +14,7 @@ export async function deleteAccount(req, res) {
 
     const userId = req.user.id;
     let client;
+    let coverUrls = [];
 
     try {
         client = await pool.connect();
@@ -33,7 +34,8 @@ export async function deleteAccount(req, res) {
 
         // Foreign keys cascade, but delete explicitly so this never depends on them.
         await client.query("DELETE FROM reading_activities WHERE user_id = $1", [userId]);
-        await client.query("DELETE FROM books WHERE user_id = $1", [userId]);
+        const books = await client.query("DELETE FROM books WHERE user_id = $1 RETURNING cover_url", [userId]);
+        coverUrls = books.rows.map((r) => r.cover_url);
         await client.query("DELETE FROM password_resets WHERE user_id = $1", [userId]);
         await client.query("DELETE FROM reading_goals WHERE user_id = $1", [userId]);
         await client.query("DELETE FROM challenges WHERE user_id = $1", [userId]);
@@ -48,12 +50,9 @@ export async function deleteAccount(req, res) {
         client?.release();
     }
 
-    // The account is gone either way; a leftover image shouldn't fail the request.
-    try {
-        await deleteAllCoversForUser(userId);
-    } catch (error) {
-        console.error("Account deleted, but removing cover images failed:", error);
-    }
+    // Delete the uploaded covers the books used. Deleting is free on Vercel Blob; listing the user's
+    // folder instead would cost a paid "advanced operation" on every account deletion. Never throws.
+    await deleteUnusedCovers(coverUrls, userId);
 
     clearSessionCookie(res);
     res.json({ message: "Your account and everything in it has been deleted.", status: "success" });

@@ -28,7 +28,17 @@ export default defineConfig({
     webServer: {
         command: "node server.js",
         url: `http://localhost:${PORT}/api/health`,
-        env: { PORT: String(PORT) },
+        // Tests run locally only and never spend cloud credits. An empty value wins over .env, because
+        // dotenv never overwrites a variable that's already set:
+        //  - BLOB_READ_WRITE_TOKEN: no Vercel Blob (account clean-up once used up a month of Blob operations)
+        //  - GOOGLE_BOOKS_API_KEY: no searches billed to the real key
+        //  - SMTP_*: no real email; reset links are printed to the console instead
+        env: {
+            PORT: String(PORT),
+            BLOB_READ_WRITE_TOKEN: "",
+            GOOGLE_BOOKS_API_KEY: "",
+            SMTP_HOST: "", SMTP_USER: "", SMTP_PASS: ""
+        },
         reuseExistingServer: false,
         timeout: 30_000
     }
