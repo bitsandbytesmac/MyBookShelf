@@ -1,4 +1,4 @@
-import { test as base, expect, type APIRequestContext, type Page } from "@playwright/test";
+import { test as base, expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 
 // Every test gets its own throwaway account (deleted afterwards), already signed in,
 // plus small API helpers for seeding data faster than clicking through the UI.
@@ -72,7 +72,19 @@ export async function deleteAccount(request: APIRequestContext, password: string
     expect([200, 401]).toContain(response.status());
 }
 
+// Tests stay on this machine: the browser may only talk to the local test server. Everything else
+// (Google Fonts, Google cover images, any other site) is stopped before it leaves, so the pages
+// fall back to system fonts. Every browser context a test uses must go through this.
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+export async function blockExternal(context: BrowserContext) {
+    await context.route((url) => (url.protocol === "http:" || url.protocol === "https:") && !LOCAL_HOSTS.has(url.hostname), (route) => route.abort("blockedbyclient"));
+}
+
 export const test = base.extend<{ account: Account; api: Api }>({
+    context: async ({ context }, use) => {
+        await blockExternal(context);
+        await use(context);
+    },
     // page.request shares the browser context's cookies, so seeding and the UI use the same session.
     account: async ({ page }, use) => {
         const account = await signUpViaApi(page.request, page);

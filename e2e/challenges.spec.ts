@@ -1,4 +1,4 @@
-import { test, expect, expectToast, dialog, today } from "./fixtures";
+import { test, expect, expectToast, dialog, today, blockExternal } from "./fixtures";
 import type { Page } from "@playwright/test";
 
 const YEAR = new Date().getFullYear();
@@ -259,6 +259,7 @@ test.describe("Smart challenges", () => {
         const mine = await addChallenge(page, { name: "Private", items: [{ label: "A", criteria: { genres: ["Fantasy"] } }] });
 
         const other = await browser.newContext({ baseURL: test.info().project.use.baseURL });
+        await blockExternal(other);
         const email = `e2e-other${Date.now()}@example.test`;
         const password = "E2e-test-pass-123";
         const registered = await other.request.post("/api/auth/register", { data: { username: `Other ${Date.now()}`, email, password } });

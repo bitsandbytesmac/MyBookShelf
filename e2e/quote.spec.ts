@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, blockExternal } from "./fixtures";
 import type { Page, BrowserContext } from "@playwright/test";
 
 const quoteCard = (page: Page) => page.locator("section.dash-quote");
@@ -23,6 +23,7 @@ async function newSession(page: Page, browserContext: BrowserContext, timezoneId
     if (page.url() === "about:blank") await openDashboard(page);
     const user = await page.evaluate(() => localStorage.getItem("user"));
     const ctx = await browser.newContext({ baseURL: "http://localhost:3210", timezoneId, storageState: { cookies, origins: [] } });
+    await blockExternal(ctx);
     await ctx.addInitScript((u) => localStorage.setItem("user", u!), user);
     return ctx;
 }
