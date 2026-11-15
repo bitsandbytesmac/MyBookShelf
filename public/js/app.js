@@ -1,6 +1,6 @@
 // App entry: routing, nav, account menu, initial load.
 import { api, logout } from "./api.js";
-import { loadAll, subscribe, state } from "./store.js";
+import { loadAll, subscribe, state, today } from "./store.js";
 import { openLogReading } from "./logReading.js";
 import { renderDashboard, currentUser } from "./dashboard.js";
 import { renderLibrary } from "./library.js";
@@ -72,6 +72,22 @@ window.addEventListener("hashchange", () => {
 });
 
 subscribe(() => render());
+
+// A new day starts at local midnight. A page left open overnight redraws by itself, so the quote of the
+// day, the streak and the calendars move on without a reload. Only pages that show "today" are redrawn,
+// and never while a dialog is open (that would close what she's typing in); it retries on the next tick.
+const DAY_PAGES = new Set(["dashboard", "statistics"]);
+let shownDay = today();
+function checkNewDay() {
+    const day = today();
+    if (day === shownDay || !state.loaded) return;
+    if (!DAY_PAGES.has(parseHash().name)) { shownDay = day; return; }
+    if (document.querySelector("dialog[open]")) return;
+    shownDay = day;
+    render();
+}
+setInterval(checkNewDay, 30_000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkNewDay(); });
 
 // ---------- Nav actions ----------
 

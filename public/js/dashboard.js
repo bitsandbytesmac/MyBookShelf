@@ -284,12 +284,51 @@ function customGoalRow(goal) {
 
 // ---------- Quote of the day ----------
 
+// The pick is random-looking but reproducible: every quote gets a score from hash(day + quote) and the
+// lowest score wins. So every reload and every device shows the same quote on the same (local) day, and
+// the next day reshuffles. Adding or removing a different quote doesn't move the winner; on top of that,
+// today's pick is remembered on this device so it stays put all day even if a new quote would outscore it.
+// Yesterday's quote is skipped so it never shows twice in a row.
+const QUOTE_PIN_KEY = "quoteOfTheDay";
+const quoteKey = (q) => `${q.book.id}\n${q.text}`;
+
+function hash32(text) {
+    let x = 0x811c9dc5; // FNV-1a, then a murmur3 finish so similar inputs spread out
+    for (let i = 0; i < text.length; i++) x = Math.imul(x ^ text.charCodeAt(i), 0x01000193);
+    x = Math.imul(x ^ (x >>> 16), 0x85ebca6b);
+    x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35);
+    return (x ^ (x >>> 16)) >>> 0;
+}
+
+function rankQuotes(all, day) {
+    return all.map((q) => ({ q, score: hash32(`${day}\n${quoteKey(q)}`) }))
+        .sort((a, b) => a.score - b.score || quoteKey(a.q).localeCompare(quoteKey(b.q)))
+        .map((r) => r.q);
+}
+
+function dayBefore(day) {
+    const [y, m, d] = day.split("-").map(Number);
+    const prev = new Date(y, m - 1, d - 1);
+    return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-${String(prev.getDate()).padStart(2, "0")}`;
+}
+
+export function quoteOfTheDay(all, day = today()) {
+    if (!all.length) return null;
+    try {
+        const pin = JSON.parse(localStorage.getItem(QUOTE_PIN_KEY) || "null");
+        const kept = pin?.day === day && all.find((q) => quoteKey(q) === pin.key);
+        if (kept) return kept;
+    } catch { /* storage blocked or corrupt: fall back to the computed pick */ }
+
+    const yesterday = all.length > 1 ? rankQuotes(all, dayBefore(day))[0] : null;
+    const pick = rankQuotes(all, day).find((q) => q !== yesterday);
+    try { localStorage.setItem(QUOTE_PIN_KEY, JSON.stringify({ day, key: quoteKey(pick) })); } catch { /* not essential */ }
+    return pick;
+}
+
 function quoteCard() {
-    const all = state.books.flatMap((b) => b.quotes.map((text) => ({ text, book: b })))
-        .sort((a, b) => a.book.id.localeCompare(b.book.id) || a.text.localeCompare(b.text)); // stable order, so the pick only changes daily
-    const now = new Date();
-    const dayNumber = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
-    const pick = all.length ? all[dayNumber % all.length] : null;
+    const all = state.books.flatMap((b) => b.quotes.map((text) => ({ text, book: b })));
+    const pick = quoteOfTheDay(all);
 
     return h("section", { class: "card dash-card dash-quote", "aria-labelledby": "dashQuoteTitle" },
         h("div", { class: "dash-card-head" }, h("h2", { id: "dashQuoteTitle" }, "Quote of the Day")),
