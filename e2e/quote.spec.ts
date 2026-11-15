@@ -85,6 +85,20 @@ test.describe("Quote of the Day", () => {
         expect(new Set(picks).size).toBeGreaterThan(3);
     });
 
+    test("no repeats two days running even when the browser remembers nothing (a fresh device every day)", async ({ page, api }) => {
+        void api;
+        await seed(page, 3); // few quotes, so skipping a repeat happens often
+        // Forget the remembered pick before every page load, like opening the app on a new device.
+        await page.addInitScript(() => localStorage.removeItem("quoteOfTheDay"));
+        const picks: string[] = [];
+        for (let day = 1; day <= 25; day++) {
+            await page.clock.setFixedTime(new Date(`2027-01-${String(day).padStart(2, "0")}T12:00:00`));
+            await openDashboard(page);
+            picks.push((await shown(page).textContent())!);
+        }
+        for (let i = 1; i < picks.length; i++) expect(picks[i], `Jan ${i + 1}`).not.toBe(picks[i - 1]);
+    });
+
     test("changes by itself at local midnight, without reloading", async ({ page, api }) => {
         void api;
         await seed(page, 5);

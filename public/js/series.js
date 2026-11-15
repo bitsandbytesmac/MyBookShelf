@@ -99,7 +99,7 @@ function seriesDetail(id) {
     }
 
     const remaining = series.outOf - series.read;
-    const missing = series.total ? Math.max(0, series.total - series.books.filter((b) => b.seriesNumber == null || Number.isInteger(b.seriesNumber)).length) : 0;
+    const { missing } = series;
 
     return h("div", {},
         back,

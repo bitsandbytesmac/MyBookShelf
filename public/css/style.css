@@ -1192,6 +1192,22 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
 .series-link svg { width: 16px; height: 16px; }
 .tile-series { font-size: 12px; font-weight: 700; color: var(--rose-deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .field-row.series-fields { grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1.2fr); }
+.series-fields { align-items: start; }
+/* Series dropdown (combobox): the list sits in the flow under the input, so the dialog never clips it */
+.combo-list {
+    list-style: none; margin: 0; padding: 4px; max-height: 220px; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow);
+}
+.combo-option {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 14px; color: var(--text);
+}
+.combo-option:hover, .combo-option[aria-selected="true"] { background: var(--blush); }
+.combo-option.is-create .combo-name { font-weight: 700; color: var(--rose-deep); }
+.combo-name { min-width: 0; overflow-wrap: anywhere; }
+.combo-count { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.combo-empty { padding: 8px 10px; font-size: 13px; color: var(--muted); }
+.combo-hint { margin: 0; }
 .series-big-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .series-pct { font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--sage-deep); font-variant-numeric: tabular-nums; }
 

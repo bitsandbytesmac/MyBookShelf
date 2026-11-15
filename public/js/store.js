@@ -449,9 +449,33 @@ function summarizeSeries(series) {
     const next = inProgress || books.find((b) => b.status === "To Be Read") || null;
     const status = read >= outOf ? "Completed" : finished.length || inProgress ? "In progress" : "Not started";
     const authors = [...new Set(books.flatMap(authorNames))];
-    return { ...series, books, read, total, outOf, next, status, authors, percent: Math.round((read / outOf) * 100) };
+    // Main books on the shelf (novellas don't take one of the total's places) and how many places are still open.
+    const onShelf = books.filter((b) => b.seriesNumber == null || Number.isInteger(b.seriesNumber)).length;
+    const missing = total ? Math.max(0, total - onShelf) : 0;
+    return { ...series, books, read, total, outOf, next, status, authors, onShelf, missing, percent: Math.round((read / outOf) * 100) };
 }
 
 export function seriesNames() {
     return seriesList().map((s) => s.name).sort((a, b) => a.localeCompare(b));
+}
+
+// Can another book still join this series? Not when it's Completed (the Series page's own status), and not
+// when "Books in series" is set and every place is already on the shelf. Without a total there's no limit.
+export function seriesHasRoom(series) {
+    return series.status !== "Completed" && (!series.total || series.missing > 0);
+}
+
+// The series offered when picking one for a book: those with room, plus the book's current series
+// (so editing a book never drops or hides the series it's already in). Sorted by name.
+export function seriesChoicesFor(book = {}) {
+    const current = book.series ? nameKey(book.series) : null;
+    return seriesList()
+        .filter((s) => s.key === current || seriesHasRoom(s))
+        .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// The saved spelling of a series typed in any case/spacing ("  harry   potter" -> "Harry Potter"), else the cleaned text.
+export function canonicalSeriesName(name) {
+    const clean = (name || "").trim().replace(/\s+/g, " ");
+    return clean ? findSeries(clean)?.name || clean : "";
 }

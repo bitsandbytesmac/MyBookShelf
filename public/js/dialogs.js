@@ -1,7 +1,7 @@
 // Add book (Google Books search or manual), Edit details, and Review dialogs.
 import { api } from "./api.js";
 import {
-    state, createBook, updateBook, genreOptions, percent, seriesNames, findSeries,
+    state, createBook, updateBook, genreOptions, percent, findSeries, seriesChoicesFor, seriesHasRoom, canonicalSeriesName,
     STATUSES, FORMATS, OWNERSHIP, GENRES, AGE_CATEGORIES
 } from "./store.js";
 import { h, icon, cover, progressBar, rateInput, multiSelect, modal, toast, stripHtml, fmt } from "./ui.js";
@@ -53,32 +53,130 @@ function textField(id, label, value = "", attrs = {}) {
     return h("div", { class: "field" }, h("label", { for: id }, label), h("input", { class: "input", id, value, autocomplete: "off", ...attrs }));
 }
 
-// Reuse the existing spelling of a series ("acotar" typed vs "ACOTAR" saved) so books group together.
+// Reuse the existing spelling of a series ("  acotar " typed vs "ACOTAR" saved) so books group together
+// and no near-duplicate series is ever created.
 function matchSeriesName(name) {
-    const clean = (name || "").trim().replace(/\s+/g, " ");
-    if (!clean) return "";
-    return seriesNames().find((n) => n.toLowerCase() === clean.toLowerCase()) || clean;
+    return canonicalSeriesName(name);
 }
 
-// Series name (suggests the user's existing series) + number in series + how many books the series has.
+const seriesCount = (s) => (s.total ? `${s.onShelf}/${s.total} books` : fmt.plural(s.onShelf, "book"));
+
+// Series name as a searchable dropdown (ARIA combobox). It lists the series that can still take a book
+// (store.seriesChoicesFor: not Completed, and a place left if "Books in series" is set), plus the book's own
+// series. Typing a name that isn't a series yet offers "Create series"; the series exists once the book is saved.
+// Then Book # and "Books in series" (picking a series you track fills in its total unless you typed one).
 function seriesFields(book, prefix) {
+    const inputId = `${prefix}Series`;
     const listId = `${prefix}SeriesOptions`;
-    const nameInput = h("input", { class: "input", id: `${prefix}Series`, value: book.series || "", list: listId, autocomplete: "off", maxlength: 200, placeholder: "Leave blank if it's a standalone" });
+    const hintId = `${prefix}SeriesHint`;
+    const choices = seriesChoicesFor(book);
+
+    const nameInput = h("input", {
+        class: "input", id: inputId, value: book.series || "", autocomplete: "off", maxlength: 200,
+        placeholder: "Pick a series or type a new one", role: "combobox",
+        "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": listId, "aria-describedby": hintId
+    });
+    const list = h("ul", { class: "combo-list", id: listId, role: "listbox", "aria-label": "Series suggestions", hidden: true });
+    const hint = h("p", { class: "hint combo-hint", id: hintId, "aria-live": "polite" });
     const totalInput = h("input", { class: "input", id: `${prefix}SeriesTotal`, type: "number", min: 1, max: 999, step: 1, inputmode: "numeric", value: book.seriesTotal ?? "" });
 
-    // Picking a series you already track fills in its total (unless you've typed one yourself).
     let typedTotal = false;
     totalInput.addEventListener("input", () => (typedTotal = true));
-    nameInput.addEventListener("input", () => {
-        if (typedTotal) return;
-        totalInput.value = findSeries(nameInput.value)?.total ?? "";
+    const fillTotal = () => {
+        if (!typedTotal) totalInput.value = findSeries(nameInput.value)?.total ?? "";
+    };
+
+    let options = [];   // [{ id, name, label, create }]
+    let active = -1;
+
+    function updateHint() {
+        const typed = nameInput.value.trim();
+        const existing = typed ? findSeries(typed) : null;
+        const isCurrent = existing && book.series && existing.key === findSeries(book.series)?.key;
+        if (!typed) hint.textContent = "Leave blank if it's a standalone.";
+        else if (!existing) hint.textContent = `New series: “${canonicalSeriesName(typed)}” is created when you save.`;
+        else if (!isCurrent && !seriesHasRoom(existing)) {
+            hint.textContent = existing.status === "Completed"
+                ? `“${existing.name}” is completed. This book will still be added to it.`
+                : `“${existing.name}” already has all ${existing.total} books. This book will still be added to it.`;
+        } else hint.textContent = `${existing.name} · ${seriesCount(existing)}`;
+    }
+
+    function setActive(i) {
+        active = i;
+        [...list.children].forEach((li, n) => li.setAttribute("aria-selected", String(n === i)));
+        if (i >= 0 && list.children[i]) {
+            nameInput.setAttribute("aria-activedescendant", list.children[i].id);
+            list.children[i].scrollIntoView({ block: "nearest" });
+        } else nameInput.removeAttribute("aria-activedescendant");
+    }
+
+    function close() {
+        list.hidden = true;
+        nameInput.setAttribute("aria-expanded", "false");
+        setActive(-1);
+    }
+
+    // filter: narrow the list to what's typed (while typing). Focusing or clicking shows every choice.
+    function open({ filter = false } = {}) {
+        const typed = nameInput.value.trim().replace(/\s+/g, " ");
+        const needle = filter ? typed.toLowerCase() : "";
+        const matches = choices.filter((c) => !needle || c.name.toLowerCase().includes(needle));
+        options = matches.map((c, i) => ({ id: `${listId}-${i}`, name: c.name, label: c.name, count: seriesCount(c) }));
+        // A name that isn't a series yet (in any spelling) can be created right here.
+        if (filter && typed && !findSeries(typed)) options.push({ id: `${listId}-new`, name: typed, label: `Create series “${typed}”`, create: true });
+
+        list.replaceChildren(...options.map((o) => h("li", {
+            id: o.id, role: "option", "aria-selected": "false", class: `combo-option${o.create ? " is-create" : ""}`,
+            // mousedown, not click: keep focus in the input so the list doesn't close first
+            onmousedown: (event) => { event.preventDefault(); choose(o); }
+        }, h("span", { class: "combo-name" }, o.label), o.count ? h("span", { class: "combo-count" }, o.count) : null)));
+        if (!options.length) {
+            list.append(h("li", { class: "combo-empty", role: "presentation" },
+                choices.length ? "No open series match. Type a name to create one." : "No open series yet. Type a name to create one."));
+        }
+        list.hidden = false;
+        nameInput.setAttribute("aria-expanded", "true");
+        setActive(-1);
+    }
+
+    function choose(option) {
+        nameInput.value = option.create ? canonicalSeriesName(option.name) : option.name;
+        fillTotal();
+        updateHint();
+        close();
+    }
+
+    nameInput.addEventListener("focus", () => open());
+    nameInput.addEventListener("click", () => list.hidden && open());
+    nameInput.addEventListener("input", () => { fillTotal(); updateHint(); open({ filter: true }); });
+    nameInput.addEventListener("blur", close);
+    nameInput.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (list.hidden) open();
+            if (!options.length) return;
+            const step = event.key === "ArrowDown" ? 1 : -1;
+            setActive(active < 0 ? (step > 0 ? 0 : options.length - 1) : (active + step + options.length) % options.length);
+        } else if (event.key === "Enter" && !list.hidden && active >= 0) {
+            event.preventDefault(); // pick the option instead of submitting the form
+            choose(options[active]);
+        } else if (event.key === "Escape" && !list.hidden) {
+            event.preventDefault(); // close the list, not the dialog
+            event.stopPropagation();
+            close();
+        } else if (event.key === "Tab") {
+            close();
+        }
     });
+    updateHint();
 
     return h("div", { class: "field-row series-fields" },
-        h("div", { class: "field" },
-            h("label", { for: `${prefix}Series` }, "Series"),
+        h("div", { class: "field combo" },
+            h("label", { for: inputId }, "Series"),
             nameInput,
-            h("datalist", { id: listId }, seriesNames().map((n) => h("option", { value: n })))
+            list,
+            hint
         ),
         h("div", { class: "field" },
             h("label", { for: `${prefix}SeriesNo` }, "Book #"),

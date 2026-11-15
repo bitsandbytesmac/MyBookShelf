@@ -312,16 +312,36 @@ function dayBefore(day) {
     return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-${String(prev.getDate()).padStart(2, "0")}`;
 }
 
+// The day's best-ranked quote that isn't the one shown the day before.
+function pickFor(all, day, previousKey) {
+    return rankQuotes(all, day).find((q) => all.length < 2 || quoteKey(q) !== previousKey);
+}
+
+// What was shown on `day`, worked out without storage: replay the picks of the two weeks before it.
+// Skipping a repeat can change one day's pick, which changes what the next day must skip, so a single
+// look back isn't enough; replaying settles on the same chain everywhere well within a few days.
+function replayedPick(all, day) {
+    const days = [day];
+    for (let i = 0; i < 14; i++) days.unshift(dayBefore(days[0]));
+    let previous = null;
+    for (const d of days) previous = quoteKey(pickFor(all, d, previous));
+    return previous;
+}
+
+function readPin() {
+    try { return JSON.parse(localStorage.getItem(QUOTE_PIN_KEY) || "null"); } catch { return null; }
+}
+
 export function quoteOfTheDay(all, day = today()) {
     if (!all.length) return null;
-    try {
-        const pin = JSON.parse(localStorage.getItem(QUOTE_PIN_KEY) || "null");
-        const kept = pin?.day === day && all.find((q) => quoteKey(q) === pin.key);
-        if (kept) return kept;
-    } catch { /* storage blocked or corrupt: fall back to the computed pick */ }
+    const pin = readPin();
+    const kept = pin?.day === day && all.find((q) => quoteKey(q) === pin.key);
+    if (kept) return kept;
 
-    const yesterday = all.length > 1 ? rankQuotes(all, dayBefore(day))[0] : null;
-    const pick = rankQuotes(all, day).find((q) => q !== yesterday);
+    // Yesterday's quote: the one this device actually showed if it remembers, else the replayed one.
+    const yesterday = dayBefore(day);
+    const shownYesterday = all.length < 2 ? null : pin?.day === yesterday ? pin.key : replayedPick(all, yesterday);
+    const pick = pickFor(all, day, shownYesterday);
     try { localStorage.setItem(QUOTE_PIN_KEY, JSON.stringify({ day, key: quoteKey(pick) })); } catch { /* not essential */ }
     return pick;
 }
