@@ -1,7 +1,9 @@
-// Statistics: the longer-term picture. A summary row, books read per month, genres, and average completion.
+// Statistics: the longer-term picture. A summary row, books read per month, genres, average completion,
+// and the Reading Recap calendar (recap.js).
 import { state, percent, booksFinished, readingStreak } from "./store.js";
 import { h, fmt, attachTooltip, stars } from "./ui.js";
 import { loadingSkeleton } from "./dashboard.js";
+import { recapCard } from "./recap.js";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -15,7 +17,8 @@ export function renderStatistics() {
                 h("h1", {}, "Statistics"),
                 h("p", {}, state.books.length ? "Your reading, in numbers." : "Add and finish some books to see your stats."))),
         h("div", { class: "stat-summary" }, summaryTiles(year)),
-        h("div", { class: "dash-grid stats-grid section" }, monthlyCard(), genresCard(), completionCard())
+        h("div", { class: "dash-grid stats-grid section" }, monthlyCard(), genresCard(), completionCard()),
+        h("div", { class: "section" }, recapCard())
     );
 }
 

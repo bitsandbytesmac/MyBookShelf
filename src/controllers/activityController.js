@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { isCalendarDate, readerToday } from "../utils/dates.js";
 
 // GET - the user's latest reading sessions (journal entries), newest day first
 export async function getReadingActivities(req, res) {
@@ -40,14 +41,16 @@ export async function getReadingActivities(req, res) {
 // GET - Retrieve reading statistics belonging to the authenticated user
 export async function getReadingStatistics(req, res) {
     try {
+        // "Today" is the reader's own date (?today=YYYY-MM-DD) when it is plausible, not the server's UTC date.
+        const day = readerToday(req.query.today);
         const statistics = await pool.query(
             `SELECT
-                COALESCE(SUM(pages_read) FILTER (WHERE session_date = CURRENT_DATE), 0) AS pages_today,
-                COALESCE(SUM(pages_read) FILTER (WHERE session_date >= DATE_TRUNC('week', CURRENT_DATE)), 0) AS pages_this_week,
-                COALESCE(SUM(pages_read) FILTER (WHERE session_date >= DATE_TRUNC('month', CURRENT_DATE)), 0) AS pages_this_month
+                COALESCE(SUM(pages_read) FILTER (WHERE session_date = COALESCE($2::date, CURRENT_DATE)), 0) AS pages_today,
+                COALESCE(SUM(pages_read) FILTER (WHERE session_date >= DATE_TRUNC('week', COALESCE($2::date, CURRENT_DATE))), 0) AS pages_this_week,
+                COALESCE(SUM(pages_read) FILTER (WHERE session_date >= DATE_TRUNC('month', COALESCE($2::date, CURRENT_DATE))), 0) AS pages_this_month
              FROM reading_activities
              WHERE user_id = $1`,
-            [req.user.id]
+            [req.user.id, day]
         );
 
         const mostReadBook = await pool.query(
@@ -66,9 +69,9 @@ export async function getReadingStatistics(req, res) {
         const days = await pool.query(
             `SELECT DISTINCT session_date
              FROM reading_activities
-             WHERE user_id = $1 AND session_date >= CURRENT_DATE - 400
+             WHERE user_id = $1 AND session_date >= COALESCE($2::date, CURRENT_DATE) - 400
              ORDER BY session_date DESC`,
-            [req.user.id]
+            [req.user.id, day]
         );
 
         res.json({
@@ -90,5 +93,106 @@ export async function getReadingStatistics(req, res) {
             message: "Failed to retrieve reading statistics.",
             status: "error"
         });
+    }
+}
+
+// ---------- Reading Recap (Statistics page) ----------
+// Both endpoints read the same reading_activities rows as the streak (readingDays above), so a day that
+// counts toward the streak is always a day with entries in the recap, and the other way round.
+// Every row is a snapshot of one session (title, pages before/after, the day it happened), so the history
+// stays the same when the book's current progress changes later.
+
+const MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/;
+
+// GET /api/activities/recap?month=YYYY-MM - one row per day with entries in that month.
+export async function getMonthRecap(req, res) {
+    const m = MONTH_RE.exec(typeof req.query.month === "string" ? req.query.month : "");
+    if (!m || Number(m[1]) < 1900 || Number(m[1]) > 2200) {
+        return res.status(400).json({ message: "Month must look like YYYY-MM.", status: "error" });
+    }
+    const month = `${m[1]}-${m[2]}`;
+
+    try {
+        const [days, first] = await Promise.all([
+            pool.query(
+                `SELECT session_date,
+                        COUNT(*)::int AS entries,
+                        COALESCE(SUM(pages_read), 0)::int AS pages,
+                        COUNT(DISTINCT book_id)::int AS books
+                 FROM reading_activities
+                 WHERE user_id = $1
+                   AND session_date >= $2::date
+                   AND session_date < ($2::date + INTERVAL '1 month')
+                 GROUP BY session_date
+                 ORDER BY session_date`,
+                [req.user.id, `${month}-01`]
+            ),
+            pool.query("SELECT MIN(session_date) AS first_date FROM reading_activities WHERE user_id = $1", [req.user.id])
+        ]);
+
+        const list = days.rows.map((r) => ({ date: r.session_date, entries: r.entries, pages: r.pages, books: r.books }));
+        res.json({
+            message: "Reading recap retrieved successfully!",
+            status: "success",
+            data: {
+                month,
+                firstDate: first.rows[0]?.first_date || null,
+                days: list,
+                totals: {
+                    days: list.length,
+                    entries: list.reduce((s, d) => s + d.entries, 0),
+                    pages: list.reduce((s, d) => s + d.pages, 0)
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error retrieving the reading recap:", error);
+        res.status(500).json({ message: "Failed to retrieve your reading recap.", status: "error" });
+    }
+}
+
+// GET /api/activities/recap/:date - every entry logged for that day, oldest first, with the book's cover.
+export async function getDayRecap(req, res) {
+    const { date } = req.params;
+    if (!isCalendarDate(date)) {
+        return res.status(400).json({ message: "Date must be a real date like 2026-11-15.", status: "error" });
+    }
+
+    try {
+        const result = await pool.query(
+            `SELECT a.id, a.book_id, a.book_title, a.previous_page, a.current_page, a.pages_read,
+                    a.session_date, a.note, a.created_at,
+                    b.title AS title, b.author, b.cover_url, b.total_pages
+             FROM reading_activities a
+             LEFT JOIN books b ON b.id = a.book_id AND b.user_id = a.user_id
+             WHERE a.user_id = $1 AND a.session_date = $2::date
+             ORDER BY a.created_at ASC, a.id ASC`,
+            [req.user.id, date]
+        );
+
+        const entries = result.rows.map((r) => ({
+            id: String(r.id),
+            bookId: r.book_id === null ? null : String(r.book_id),
+            // The title as it is now; the snapshot taken at the time if the book is gone.
+            title: r.title || r.book_title,
+            author: r.author || "",
+            coverUrl: r.cover_url || "",
+            totalPages: r.total_pages === null || r.total_pages === undefined ? null : Number(r.total_pages),
+            previousPage: r.previous_page,
+            currentPage: r.current_page,
+            pagesRead: r.pages_read || 0,
+            sessionDate: r.session_date,
+            note: r.note || "",
+            createdAt: r.created_at
+        }));
+
+        res.json({
+            message: "Reading recap retrieved successfully!",
+            status: "success",
+            data: { date, entries, pages: entries.reduce((s, e) => s + e.pagesRead, 0) }
+        });
+    } catch (error) {
+        console.error("Error retrieving the day's reading:", error);
+        res.status(500).json({ message: "Failed to retrieve that day's reading.", status: "error" });
     }
 }

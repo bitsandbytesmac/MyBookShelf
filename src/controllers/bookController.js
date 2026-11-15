@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { readerToday } from "../utils/dates.js";
 import { deleteUnusedCovers } from "../services/coverStorage.js";
 
 export const BOOK_STATUSES = ["To Be Read", "Reading", "Read", "DNF", "Paused"];
@@ -221,7 +222,8 @@ function parseSession(body = {}) {
     if (date.value && date.value > latest) return { error: "The reading date can't be in the future." };
     const note = optionalText(body.sessionNote, LIMITS.longText, "Note");
     if (note.error) return { error: note.error };
-    return { date: date.value, note: note.value };
+    // The reader's own date, used when no session date was picked (see utils/dates.js).
+    return { date: date.value, note: note.value, today: readerToday(body.localDate) };
 }
 
 // PUT - replace a book's details (the client always sends the full book)
@@ -267,9 +269,9 @@ export async function updateBook(req, res) {
         if ((values.current_page > previousPage && !finishedBefore) || session.note) {
             await client.query(
                 `INSERT INTO reading_activities (user_id, book_id, book_title, previous_page, current_page, pages_read, session_date, note)
-                 VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, CURRENT_DATE), $8)`,
+                 VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, $9::date, CURRENT_DATE), $8)`,
                 [req.user.id, req.params.id, values.title, previousPage, values.current_page,
-                    Math.max(0, values.current_page - previousPage), session.date, session.note]
+                    Math.max(0, values.current_page - previousPage), session.date, session.note, session.today]
             );
         }
 

@@ -62,6 +62,12 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
 
 const dateOnly = (value) => (value ? String(value).slice(0, 10) : null);
 
+// Today in the reader's time zone, "YYYY-MM-DD" (same as store.today(); api.js can't import the store).
+function localDate() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // Convert a database row to the shape the UI uses.
 export function normalizeBook(row) {
     const genres = Array.isArray(row.genres) && row.genres.length ? row.genres : row.genre ? [row.genre] : [];
@@ -162,8 +168,14 @@ export const api = {
         return normalizeBook((await request("/api/books", { method: "POST", body: toPayload(book) })).data);
     },
     // session (optional): { date: "YYYY-MM-DD", note } - a "Log your reading" journal entry saved with the update.
+    // localDate: the reader's own calendar date, so an entry saved at 7 am in UTC+8 lands on today, not
+    // on the server's (UTC) yesterday. The server only accepts it within a day of its own date.
     async updateBook(id, book, session = null) {
-        const body = { ...toPayload(book), ...(session ? { sessionDate: session.date || null, sessionNote: session.note || null } : {}) };
+        const body = {
+            ...toPayload(book),
+            localDate: localDate(),
+            ...(session ? { sessionDate: session.date || null, sessionNote: session.note || null } : {})
+        };
         return normalizeBook((await request(`/api/books/${encodeURIComponent(id)}`, { method: "PUT", body })).data);
     },
     deleteBook: (id) => request(`/api/books/${encodeURIComponent(id)}`, { method: "DELETE" }),
@@ -172,7 +184,14 @@ export const api = {
         return (await request("/api/activities")).data;
     },
     async getStatistics() {
-        return (await request("/api/activities/statistics")).data;
+        return (await request(`/api/activities/statistics?today=${localDate()}`)).data;
+    },
+    // Reading Recap: days with entries in a month ("YYYY-MM"), and every entry of one day ("YYYY-MM-DD").
+    async getRecapMonth(month) {
+        return (await request(`/api/activities/recap?month=${encodeURIComponent(month)}`)).data;
+    },
+    async getRecapDay(date) {
+        return (await request(`/api/activities/recap/${encodeURIComponent(date)}`)).data;
     },
 
     async getGoals() {

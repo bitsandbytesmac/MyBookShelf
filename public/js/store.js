@@ -59,6 +59,7 @@ export const state = {
     books: [],
     activities: [],
     statistics: null,
+    activityVersion: 0,  // bumped whenever the journal is re-fetched (the Reading Recap drops its cache)
     goals: { monthlyGoal: 2, yearlyGoal: 12 },
     customGoals: [],
     challenges: [],
@@ -118,6 +119,7 @@ export async function refreshActivity({ silent = false } = {}) {
         const [activities, statistics] = await Promise.all([api.getActivities(), api.getStatistics()]);
         state.activities = activities;
         state.statistics = statistics;
+        state.activityVersion++;
     } catch (error) {
         console.error("Failed to load reading activity:", error);
     }
@@ -338,14 +340,19 @@ export function readingDays() {
 
 // Consecutive days with a session, ending today. If today has none yet, the streak from yesterday still counts.
 export function readingStreak(days = readingDays()) {
+    return streakRun(days).length;
+}
+
+// The days that make up the current streak, newest first (the Reading Recap highlights them).
+export function streakRun(days = readingDays()) {
     const d = new Date();
     if (!days.has(dayString(d))) d.setDate(d.getDate() - 1);
-    let streak = 0;
+    const run = [];
     while (days.has(dayString(d))) {
-        streak++;
+        run.push(dayString(d));
         d.setDate(d.getDate() - 1);
     }
-    return streak;
+    return run;
 }
 
 export function booksFinished({ year, month } = {}) {

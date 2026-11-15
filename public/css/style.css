@@ -710,6 +710,44 @@ a.entry:hover { border-color: var(--rose); box-shadow: var(--shadow); transform:
 .stat-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .stat-tile .stars svg { width: 16px; height: 16px; }
 
+/* Reading Recap (Statistics): month calendar + the picked day's entries */
+.recap-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.recap-nav { display: flex; align-items: center; gap: 4px; }
+.recap-nav .btn { font-size: 20px; line-height: 1; width: 36px; padding: 0; }
+.recap-month { min-width: 9.5em; text-align: center; font-weight: 700; color: var(--text); }
+.recap-body { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 28px; margin-top: 18px; }
+.recap-cal.is-loading .recap-grid { opacity: .55; }
+.recap-grid { gap: 5px; }
+.recap-grid .cal-head { font-size: 11px; }
+.recap-day { font: inherit; font-size: 12px; cursor: pointer; padding: 0; }
+.recap-day:hover { border-color: var(--sage); }
+.recap-day:focus-visible { outline: 2px solid var(--rose-deep); outline-offset: 2px; }
+.cal-day.is-streak { border: 2px solid var(--sage-deep); }
+.cal-day.is-read.is-streak { border-color: var(--sage-deep); }
+.recap-day.is-selected { box-shadow: 0 0 0 3px var(--rose-deep); }
+.recap-day.is-future { opacity: .45; }
+.recap-summary { margin-top: 10px; font-size: 13px; color: var(--text-2); }
+.recap-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.recap-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.recap-legend .cal-day { width: 14px; aspect-ratio: 1; border-radius: 4px; }
+.recap-day-panel { min-width: 0; }
+.recap-date { font-size: 16px; font-weight: 700; color: var(--text); }
+.recap-day-sum { margin-top: 2px; font-size: 13px; color: var(--muted); }
+.recap-entries { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.recap-entry { display: flex; gap: 12px; align-items: flex-start; }
+.recap-entry .cover { flex: none; }
+.recap-entry-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.recap-title { font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+a.recap-title:hover { color: var(--rose-deep); }
+.recap-author { font-size: 13px; color: var(--text-2); }
+.recap-progress { font-size: 13px; color: var(--sage-deep); font-variant-numeric: tabular-nums; }
+.recap-note { margin: 4px 0 0; font-size: 14px; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.recap-when { font-size: 12px; color: var(--muted); }
+.recap-error { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-size: 14px; color: var(--danger); }
+@media (max-width: 760px) {
+    .recap-body { grid-template-columns: minmax(0, 1fr); }
+}
+
 .goal { padding: 22px; }
 .goal-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; margin-top: 16px; }
 .goal-block .label { display: block; font-weight: 700; }
