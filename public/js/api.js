@@ -78,6 +78,10 @@ export function normalizeBook(row) {
         subgenres: Array.isArray(row.subgenres) ? row.subgenres : [],
         tropes: Array.isArray(row.tropes) ? row.tropes : [],
         contentWarnings: Array.isArray(row.content_warnings) ? row.content_warnings : [],
+        themes: Array.isArray(row.themes) ? row.themes : [],
+        settings: Array.isArray(row.settings) ? row.settings : [],
+        characters: Array.isArray(row.characters) ? row.characters : [],
+        publishedYear: row.published_year != null ? Number(row.published_year) : null,
         format: row.format || "",
         ownership: row.ownership || "",
         ageCategory: row.age_category || "",
@@ -112,6 +116,10 @@ function toPayload(book) {
         subgenres: book.subgenres || [],
         tropes: book.tropes || [],
         contentWarnings: book.contentWarnings || [],
+        themes: book.themes || [],
+        settings: book.settings || [],
+        characters: book.characters || [],
+        publishedYear: book.publishedYear ?? null,
         format: book.format || null,
         ownership: book.ownership || null,
         ageCategory: book.ageCategory || null,
@@ -199,8 +207,9 @@ export const api = {
         return (await request("/api/challenges", { method: "POST", body: challenge })).data;
     },
     async updateChallenge(id, challenge) {
-        const { name, description, items } = challenge;
-        return (await request(`/api/challenges/${encodeURIComponent(id)}`, { method: "PUT", body: { name, description, items } })).data;
+        // Full replacement: send every field the server keeps.
+        const { name, description, startsOn, endsOn, autoMatch, items } = challenge;
+        return (await request(`/api/challenges/${encodeURIComponent(id)}`, { method: "PUT", body: { name, description, startsOn, endsOn, autoMatch, items } })).data;
     },
     deleteChallenge: (id) => request(`/api/challenges/${encodeURIComponent(id)}`, { method: "DELETE" }),
 

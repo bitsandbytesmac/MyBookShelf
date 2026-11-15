@@ -1287,6 +1287,130 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
 .challenge-add { display: flex; gap: 8px; margin-top: 14px; }
 .challenge-add .input { flex: 1; min-width: 0; }
 
+/* ---------- Smart challenges ---------- */
+
+/* Why a book matches: solid chips are confirmed (from the book's own tags), dashed ones only "possible". */
+.reason-chips, .rule-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.reason-chip, .rule-chip {
+    display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+.reason-chip { background: var(--sage-soft); color: var(--sage-deep); }
+.reason-chip.is-possible { background: transparent; border: 1px dashed var(--rose); color: var(--rose-deep); }
+.rule-chip { background: var(--blush); color: var(--text); }
+.rule-chip.is-manual { background: var(--surface-2); color: var(--text-2); }
+.match-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; }
+.match-badge svg { width: 13px; height: 13px; }
+.match-badge.is-confirmed { color: var(--sage-deep); }
+.match-badge.is-possible { color: var(--rose-deep); }
+
+.template-preview:empty { display: none; }
+.range-pair { display: flex; align-items: center; gap: 8px; }
+.range-pair .input { min-width: 0; }
+.range-pair span { font-size: 13px; color: var(--muted); }
+
+/* Spot panel */
+.spot-rules { display: flex; flex-direction: column; gap: 6px; }
+.spot-current { padding: 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); }
+.spot-current.is-done { background: var(--sage-soft); border-color: transparent; }
+.spot-current .label { display: block; margin-bottom: 6px; }
+.match-section h3 { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.match-section h3 .count { font-family: var(--font); font-size: 12px; color: var(--muted); }
+.match-section .hint { margin: 2px 0 8px; }
+.match-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.match-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.match-row.is-pick { cursor: default; }
+.match-cover { flex-shrink: 0; display: block; }
+.match-cover .cover { width: 38px; }
+.match-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.match-info strong { font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.match-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.match-meta .badge { height: 20px; font-size: 10px; padding: 0 8px; }
+.match-row > .btn { flex-shrink: 0; }
+.pick-box { display: flex; cursor: pointer; }
+.pick-box input { width: 20px; height: 20px; margin: 0; accent-color: var(--sage-deep); cursor: pointer; }
+.spot-manual-row { display: flex; gap: 8px; }
+.spot-manual-row .select { flex: 1; min-width: 0; }
+.spot-discover { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.spot-ideas { width: 100%; }
+
+/* "You unlocked challenge spots!" */
+.unlock-book { display: flex; align-items: center; gap: 12px; }
+.unlock-book > div { display: flex; flex-direction: column; gap: 2px; }
+.unlock-book strong { font-family: var(--serif); font-size: 17px; }
+.unlock-group h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 15px; margin-bottom: 8px; }
+.unlock-group h3 .count { font-family: var(--font); font-size: 12px; color: var(--muted); }
+.unlock-done { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 13px; font-weight: 700; color: var(--sage-deep); }
+.unlock-done svg { width: 14px; height: 14px; }
+
+/* Challenge dashboard */
+.challenge-dates { font-size: 12px; font-weight: 700; color: var(--muted); }
+.challenge-card .cover-stack { margin-top: 4px; }
+.challenge-card .cover-stack .cover { width: 34px; margin-right: -10px; }
+.challenge-card.is-completed { background: var(--sage-soft); border-color: transparent; }
+.challenge-card .badge svg { width: 12px; height: 12px; margin-right: 3px; }
+.challenge-discovery { align-items: start; }
+
+.open-spots, .reco-list, .unlocked-list { list-style: none; margin: 0; padding: 0; }
+.open-spots { display: flex; flex-direction: column; gap: 6px; }
+.open-spot {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; text-align: left; cursor: pointer;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text);
+}
+.open-spot:hover, .open-spot:focus-visible { border-color: var(--rose); }
+.open-spot > svg { width: 16px; height: 16px; color: var(--muted); flex-shrink: 0; }
+.open-spot-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.open-spot-text strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.open-spot-text small { font-size: 12px; color: var(--muted); }
+.open-spot-counts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.count-chip { height: 20px; padding: 0 8px; display: inline-flex; align-items: center; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--blush); color: var(--text); white-space: nowrap; }
+.count-chip.is-ready { background: var(--sage); color: var(--on-sage); }
+.count-chip.is-possible { background: transparent; border: 1px dashed var(--rose); color: var(--rose-deep); }
+.count-chip.is-none { background: var(--surface-2); color: var(--text-2); }
+
+.reco-list { display: flex; flex-direction: column; gap: 8px; }
+.reco { display: flex; gap: 12px; padding: 8px; border-radius: var(--radius-sm); color: var(--text); }
+.reco:hover { background: var(--blush-soft); text-decoration: none; }
+.reco .cover { width: 46px; }
+.reco-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.reco-text strong { font-size: 14px; line-height: 1.3; }
+.reco-text small { font-size: 12px; color: var(--muted); }
+
+.unlocked-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 12px; }
+.unlocked { position: relative; display: flex; gap: 12px; padding: 12px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.unlocked:hover { border-color: var(--rose); text-decoration: none; }
+.unlocked .cover { width: 50px; }
+.unlocked-check {
+    position: absolute; left: 50px; top: 6px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--sage); color: var(--on-sage); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.unlocked-check svg { width: 13px; height: 13px; }
+.unlocked-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.unlocked-text strong { font-family: var(--serif); font-size: 15px; }
+.unlocked-text small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Board additions */
+.board-dates { margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.board-fill { margin: 16px auto 0; }
+.slot-add { display: grid; place-items: center; background: transparent; border-style: dashed; border-color: var(--border-strong); }
+.slot-plus.is-on { opacity: 1; background: var(--blush); color: var(--rose-deep); }
+.slot-hint {
+    position: absolute; left: 6px; right: 6px; bottom: 6px; padding: 3px 6px; border-radius: 999px; text-align: center;
+    background: rgba(255, 255, 255, 0.92); color: #3a2f2f; font-size: 10px; font-weight: 800;
+}
+.slot-hint.is-ready { background: var(--sage); color: var(--on-sage); }
+.slot-hint.is-possible { border: 1px dashed var(--rose-deep); }
+.slot-rules { max-width: 130px; font-size: 11px; color: var(--muted); }
+
+/* Book page: Challenge spots card */
+.spot-group { display: block; margin: 14px 0 6px; }
+.spot-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.spot-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.spot-row-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.spot-row-text a { font-size: 12px; font-weight: 700; }
+.spot-row-text strong { font-size: 14px; }
+.spot-row > .btn, .spot-row > .match-badge { flex-shrink: 0; }
+
 @media (max-width: 640px) {
     .bookcase { --book-w: 56px; --headroom: 16px; --plank: 13px; padding: calc(var(--vine-h) - 4px) 10px 0; border-width: 8px; }
     .shelf { column-gap: 8px; margin: 0 -10px; padding: 0 10px; justify-content: space-evenly; }
@@ -1512,6 +1636,11 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
     .vbar-label { font-size: 10px; }
     .challenge-add { flex-direction: column; }
     .challenge-add .input { flex: none; }
+    .match-row { flex-wrap: wrap; }
+    .match-row > .btn { margin-left: 50px; }
+    .open-spot { flex-wrap: wrap; }
+    .open-spot-counts { justify-content: flex-start; }
+    .spot-row { flex-wrap: wrap; }
     .challenge-board { padding: 52px 14px 20px; }
     .board-title { margin: 0; }
     .board-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 10px; }

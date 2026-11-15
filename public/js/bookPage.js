@@ -1,5 +1,7 @@
 // Single book page: details, reading sessions, notes, and review.
-import { state, getBook, updateBook, deleteBook, percent, STATUSES, authorNames } from "./store.js";
+import { state, getBook, updateBook, deleteBook, percent, STATUSES, authorNames, assignSpots, today } from "./store.js";
+import { spotsForBook, inWindow } from "./challengeMatch.js";
+import { challengeHref, reasonChips, openSpot } from "./challengeDialogs.js";
 import { h, icon, cover, progressBar, statusBadge, stars, chilis, fmt, toast, confirmDialog, authorHref, seriesHref, seriesLabel } from "./ui.js";
 import { openEditBook, openReview } from "./dialogs.js";
 import { loadingSkeleton } from "./dashboard.js";
@@ -32,7 +34,7 @@ export function renderBookPage(params, id) {
         h("a", { class: "back-link", href: "#/library" }, icon("back"), "Library"),
         hero(book),
         h("div", { class: "book-cols" },
-            h("div", {}, progressCard(book), reviewCard(book)),
+            h("div", {}, progressCard(book), reviewCard(book), challengeSpotsCard(book)),
             h("div", {}, detailsCard(book), notesCard(book))
         )
     );
@@ -221,23 +223,76 @@ function detailsCard(book) {
             row("Genres", book.genres.join(", ")),
             row("Sub-genres", book.subgenres.join(", ")),
             row("Tropes", book.tropes.join(", ")),
+            row("Themes & keywords", book.themes.join(", ")),
+            row("Setting", book.settings.join(", ")),
+            row("Characters", book.characters.join(", ")),
+            row("Published", book.publishedYear ?? ""),
             row("Content warnings", book.contentWarnings.length
                 ? h("details", { class: "cw-reveal" },
                     h("summary", {}, `Show ${fmt.plural(book.contentWarnings.length, "warning")}`),
                     h("span", {}, book.contentWarnings.join(", ")))
                 : ""),
-            row("Challenges", inChallenges(book)),
             row("Added", book.createdAt ? fmt.date(String(book.createdAt).slice(0, 10)) : "")
         )
     );
 }
 
-// "A to Z Challenge · B, Summer Reads · A book set by the sea" as links (empty if none).
-function inChallenges(book) {
-    const links = state.challenges.flatMap((c) => c.items
-        .filter((it) => it.bookId === book.id)
-        .map((it) => h("a", { href: `#/challenges/${encodeURIComponent(c.id)}` }, `${c.name} · ${it.label}`)));
-    return links.length ? links.flatMap((a, i) => [i ? ", " : null, a]) : "";
+// ---------- Challenge spots ----------
+
+// The spots this book fills, the open spots it fits (confirmed), and possible ones (from its summary only).
+function challengeSpotsCard(book) {
+    const entries = spotsForBook(book, state.challenges, state.books, today());
+    const filled = entries.filter((e) => e.filledByThis);
+    const confirmed = entries.filter((e) => !e.filledByThis && e.match.status === "confirmed");
+    const possible = entries.filter((e) => !e.filledByThis && e.match.status === "possible");
+
+    const add = (e) => async () => {
+        try {
+            await assignSpots(e.challenge.id, { [e.index]: book.id });
+            toast(book.status === "Read" ? `Counts for “${e.item.label}” 🎉` : `Planned for “${e.item.label}”. It counts once you finish the book.`);
+        } catch (error) {
+            toast(error.message, { error: true });
+        }
+    };
+
+    const row = (e, action) => h("li", { class: "spot-row" },
+        h("div", { class: "spot-row-text" },
+            h("a", { href: challengeHref(e.challenge.id) }, e.challenge.name),
+            h("strong", {}, e.item.label),
+            e.match.reasons.length ? reasonChips(e.match) : null),
+        action);
+
+    const card = h("section", { class: "card card-pad challenge-spots", "aria-labelledby": "bookSpotsTitle" },
+        h("div", { class: "review-head" }, h("h3", { id: "bookSpotsTitle" }, "Challenge spots"), h("a", { class: "link-btn", href: "#/challenges" }, "All challenges")));
+
+    if (!entries.length) {
+        card.append(h("p", { class: "sub", style: { marginTop: "8px" } }, state.challenges.length
+            ? "No open challenge spot fits this book yet. Add themes, setting or characters in Edit details to find more matches."
+            : "Start a challenge and books like this one fill its spots."));
+        return card;
+    }
+
+    if (filled.length) {
+        card.append(h("p", { class: "label spot-group" }, "In your challenges"),
+            h("ul", { class: "spot-rows" }, filled.map((e) => row(e,
+                book.status === "Read"
+                    ? h("span", { class: "match-badge is-confirmed" }, icon("check"), "Counts")
+                    : h("button", { type: "button", class: "btn btn-sm btn-ghost", onclick: () => openSpot(e.challenge.id, e.index) }, "Planned")))));
+    }
+    if (confirmed.length) {
+        card.append(h("p", { class: "label spot-group" }, book.status === "Read" ? "Can count for" : "Can fill once finished"),
+            h("ul", { class: "spot-rows" }, confirmed.map((e) => row(e,
+                book.status === "Read" && !inWindow(book, e.challenge)
+                    ? h("span", { class: "hint" }, "Finished outside the dates")
+                    : h("button", { type: "button", class: "btn btn-sm btn-primary", onclick: add(e) }, book.status === "Read" ? "Count it" : "Plan it")))));
+    }
+    if (possible.length) {
+        card.append(h("p", { class: "label spot-group" }, "Possible matches"),
+            h("p", { class: "hint" }, "Only the summary suggests these, so check before adding."),
+            h("ul", { class: "spot-rows" }, possible.map((e) => row(e,
+                h("button", { type: "button", class: "btn btn-sm btn-ghost", onclick: add(e) }, "Add anyway")))));
+    }
+    return card;
 }
 
 // ---------- Notes ----------

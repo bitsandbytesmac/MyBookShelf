@@ -1,5 +1,6 @@
 // Central app state. Views subscribe and re-render on change.
 import { api } from "./api.js";
+import { challengeProgress as progressOf, spotDone } from "./challengeMatch.js";
 
 export const STATUSES = ["To Be Read", "Reading", "Read", "Paused", "DNF"];
 export const FORMATS = ["Paperback", "Hardbound", "E-book", "Audiobook"];
@@ -35,6 +36,23 @@ export const CONTENT_WARNINGS = [
     "Animal death", "Cheating", "Racism", "Homophobia"
 ];
 
+// Suggestions for the tags the challenge matcher reads. Readers can add their own.
+export const THEMES = [
+    "Friendship", "Family", "Grief", "Love", "Revenge", "Redemption", "Identity", "Coming of age",
+    "Survival", "Power", "War", "Magic", "Mental health", "Found family", "Second chances", "Self-discovery",
+    "Betrayal", "Justice", "Hope", "Books about books"
+];
+export const SETTINGS = [
+    "Small town", "Big city", "Boarding school", "University", "Royal court", "Castle", "Space", "Island",
+    "By the sea", "Forest", "Desert", "Mountains", "Winter", "Paris", "London", "New York", "Japan",
+    "Victorian England", "Regency era", "World War II", "Future", "Fantasy world", "Bookshop"
+];
+export const CHARACTERS = [
+    "Female lead", "Male lead", "Morally grey", "Villain lead", "Anti-hero", "Royalty", "Witch",
+    "Detective", "Assassin", "Dragon rider", "Artist", "Doctor", "Twins", "Siblings", "Queer lead",
+    "BIPOC lead", "Disabled lead", "Older protagonist", "Child narrator", "Multiple POV", "Unreliable narrator"
+];
+
 const listeners = new Set();
 
 export const state = {
@@ -62,7 +80,10 @@ export function getBook(id) {
 }
 
 // Every genre/sub-genre/trope/content warning in use, plus the defaults.
-const DEFAULT_OPTIONS = { genres: GENRES, subgenres: SUBGENRES, tropes: TROPES, contentWarnings: CONTENT_WARNINGS };
+const DEFAULT_OPTIONS = {
+    genres: GENRES, subgenres: SUBGENRES, tropes: TROPES, contentWarnings: CONTENT_WARNINGS,
+    themes: THEMES, settings: SETTINGS, characters: CHARACTERS
+};
 export function genreOptions(kind = "genres") {
     const defaults = DEFAULT_OPTIONS[kind];
     const used = state.books.flatMap((b) => b[kind] || []);
@@ -159,7 +180,8 @@ function syncSeriesTotal(saved) {
 
 export async function createBook(data) {
     const book = {
-        status: "To Be Read", genres: [], subgenres: [], tropes: [], contentWarnings: [], quotes: [], isFavorite: false, ...data
+        status: "To Be Read", genres: [], subgenres: [], tropes: [], contentWarnings: [], themes: [], settings: [], characters: [],
+        quotes: [], isFavorite: false, ...data
     };
     // A new book joins its series' existing total instead of clearing it.
     if (book.series && book.seriesTotal == null) book.seriesTotal = findSeries(book.series)?.total ?? null;
@@ -168,6 +190,7 @@ export async function createBook(data) {
     state.books.unshift(saved);
     syncSeriesTotal(saved);
     emit();
+    if (saved.status === "Read") notifyFinished(saved);
     return saved;
 }
 
@@ -177,6 +200,7 @@ export async function updateBook(id, changes, { session = null } = {}) {
     if (!current) throw new Error("Book not found.");
 
     const previousPage = current.currentPage;
+    const wasRead = current.status === "Read";
     const next = applyReadingRules({ ...current, ...changes }, current);
     const saved = await api.updateBook(id, next, session);
     Object.assign(current, saved);
@@ -186,13 +210,29 @@ export async function updateBook(id, changes, { session = null } = {}) {
     if (saved.currentPage > previousPage || session?.note) await refreshActivity({ silent: true });
 
     emit();
+    if (!wasRead && current.status === "Read") notifyFinished(current);
     return current;
 }
 
 export async function deleteBook(id) {
     await api.deleteBook(id);
     state.books = state.books.filter((book) => book.id !== String(id));
+    // The server freed this book's challenge spots; mirror that.
+    for (const c of state.challenges) {
+        c.items = c.items.map((it) => (it.bookId === String(id) ? { ...it, bookId: null, assignedAt: undefined } : it));
+    }
     emit();
+}
+
+// "A book was just finished": the challenge module listens so it can offer the spots the book unlocks.
+const finishedListeners = new Set();
+export function onBookFinished(fn) {
+    finishedListeners.add(fn);
+    return () => finishedListeners.delete(fn);
+}
+function notifyFinished(book) {
+    // After the current toast/dialog has settled.
+    setTimeout(() => finishedListeners.forEach((fn) => fn(book)), 0);
 }
 
 export async function saveGoals(goals) {
@@ -243,16 +283,28 @@ export async function deleteChallenge(id) {
     emit();
 }
 
-// A prompt counts as done when ticked, or when its linked book is finished.
+// A spot counts once its book is finished (see challengeMatch.js for every matching rule).
 export function challengeItemDone(item) {
-    if (item.done) return true;
-    return item.bookId ? getBook(item.bookId)?.status === "Read" : false;
+    return spotDone(item, state.books);
 }
 
 export function challengeProgress(challenge) {
-    const total = challenge.items.length;
-    const done = challenge.items.filter(challengeItemDone).length;
-    return { done, total, percent: total ? Math.round((done / total) * 100) : 0 };
+    return progressOf(challenge, state.books);
+}
+
+// Put a book on a spot (or several spots of one challenge) in a single save.
+export async function assignSpots(challengeId, assignments) {
+    const challenge = getChallenge(challengeId);
+    if (!challenge) throw new Error("Challenge not found.");
+    const now = new Date().toISOString();
+    const items = challenge.items.map((it, i) => {
+        if (!(i in assignments)) return it;
+        const bookId = assignments[i];
+        const { assignedAt, ...rest } = it;
+        void assignedAt;
+        return bookId ? { ...rest, bookId, assignedAt: now } : { ...rest, bookId: null, done: false };
+    });
+    return updateChallenge(challengeId, { items });
 }
 
 // ---------- Derived ----------

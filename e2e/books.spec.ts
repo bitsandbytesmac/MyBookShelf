@@ -65,7 +65,7 @@ test.describe("Books", () => {
 
         // Genres, sub-genres, tropes and warnings all fold away, closed by default.
         const folds = edit.locator("details.foldout");
-        await expect(folds.locator("summary")).toHaveText([/^Genres/, /^Sub-genres/, /^Tropes/, /^Trigger \/ content warnings/]);
+        await expect(folds.locator("summary")).toHaveText([/^Genres/, /^Sub-genres/, /^Tropes/, /^Themes & keywords/, /^Setting/, /^Characters/, /^Trigger \/ content warnings/]);
         for (const fold of await folds.all()) await expect(fold).not.toHaveAttribute("open");
 
         await edit.getByLabel("Books in series", { exact: true }).fill("5");

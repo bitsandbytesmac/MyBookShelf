@@ -66,6 +66,14 @@ function seriesTotal(value) {
     return { value: n };
 }
 
+// Year of publication (from Google Books or the reader).
+function publishedYear(value) {
+    if (value === undefined || value === null || value === "") return { value: null };
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 0 || n > 2200) return { error: "Published year must be a year like 1999." };
+    return { value: n };
+}
+
 function pageNumber(value, label) {
     if (value === undefined || value === null || value === "") return { value: 0 };
     const n = Number(value);
@@ -91,6 +99,10 @@ function parseBook(body = {}) {
         age_category: optionalChoice(body.ageCategory, AGE_CATEGORIES, "Age category"),
         tropes: stringList(body.tropes, LIMITS.labels, LIMITS.tag, "Tropes"),
         content_warnings: stringList(body.contentWarnings, LIMITS.labels, LIMITS.tag, "Content warnings"),
+        themes: stringList(body.themes, LIMITS.labels, LIMITS.tag, "Themes"),
+        settings: stringList(body.settings, LIMITS.labels, LIMITS.tag, "Settings"),
+        characters: stringList(body.characters, LIMITS.labels, LIMITS.tag, "Characters"),
+        published_year: publishedYear(body.publishedYear),
         status: optionalChoice(body.status || "To Be Read", BOOK_STATUSES, "Book status"),
         total_pages: pageNumber(body.totalPages, "Total pages"),
         current_page: pageNumber(body.currentPage, "Current page"),
@@ -131,7 +143,7 @@ function parseBook(body = {}) {
 
 const COLUMNS = [
     "title", "author", "summary", "cover_url", "series", "series_number", "series_total", "genres", "subgenres",
-    "format", "ownership", "age_category", "tropes", "content_warnings", "status",
+    "format", "ownership", "age_category", "tropes", "content_warnings", "themes", "settings", "characters", "published_year", "status",
     "total_pages", "current_page", "rating", "spice", "quotes", "review", "personal_notes",
     "date_started", "date_finished", "is_favorite", "reviewed", "journaled", "genre", "completed_at"
 ];
@@ -286,6 +298,19 @@ export async function deleteBook(req, res) {
 
         const { cover_url: cover, ...data } = deleted.rows[0];
         await deleteUnusedCovers([cover], req.user.id);
+
+        // Free any challenge spot this book filled (the spot stays, empty).
+        await pool.query(
+            `UPDATE challenges
+             SET items = (
+                 SELECT COALESCE(jsonb_agg(
+                     CASE WHEN item->>'bookId' = $1 THEN item || '{"bookId": null}'::jsonb ELSE item END
+                     ORDER BY ord), '[]'::jsonb)
+                 FROM jsonb_array_elements(items) WITH ORDINALITY AS t(item, ord)),
+                 updated_at = NOW()
+             WHERE user_id = $2 AND items @> jsonb_build_array(jsonb_build_object('bookId', $1::text))`,
+            [String(data.id), req.user.id]
+        );
 
         res.json({ message: "Book deleted successfully!", status: "success", data });
     } catch (error) {

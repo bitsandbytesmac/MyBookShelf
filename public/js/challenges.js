@@ -1,25 +1,17 @@
-// Challenges: reader-made reading challenges (e.g. a Rainbow or A to Z challenge).
-// A challenge is shown as a board: its title, what kind of challenge it is, and one book-shaped
-// slot per prompt. A slot holds a linked book's cover; it's done when ticked or when that book is Read.
-// New challenges start from a book's Edit details (the "New challenge" button picks the book).
+// Challenges: smart reading challenges. The index is a challenge dashboard (active / upcoming / completed,
+// open spots, books from your shelf that fit them, recently unlocked spots). A challenge page is a board of
+// book-shaped spots; each spot has matching rules, and books fill spots automatically (see challengeMatch.js).
+import { state, getBook, getChallenge, deleteChallenge, today } from "./store.js";
 import {
-    state, getBook, getChallenge, updateChallenge, deleteChallenge,
-    challengeItemDone, challengeProgress, seriesList
-} from "./store.js";
-import { h, icon, cover, coverStack, progressBar, statusBadge, fmt, toast, modal, confirmDialog, seriesLabel } from "./ui.js";
+    challengeState, challengeProgress, suggestionsForSpot, spotOpen, spotDone, matchSpot, proposeFills, hasCriteria
+} from "./challengeMatch.js";
+import { h, icon, cover, coverStack, progressBar, fmt, toast, confirmDialog } from "./ui.js";
 import { loadingSkeleton } from "./dashboard.js";
-import { openEditBook } from "./dialogs.js";
+import {
+    challengeHref, openCreateChallenge, openEditChallenge, openSpot, openSpotEditor, openFillReview
+} from "./challengeDialogs.js";
 
-const challengeHref = (id) => `#/challenges/${encodeURIComponent(id)}`;
-
-async function run(action, message) {
-    try {
-        await action();
-        if (message) toast(message);
-    } catch (error) {
-        toast(error.message, { error: true });
-    }
-}
+const view = { tab: "active" };
 
 export function renderChallenges(params, id) {
     if (!state.loaded) return loadingSkeleton();
@@ -45,108 +37,174 @@ export function promptColour(label) {
     return PROMPT_COLOURS.find(([name]) => text === name || text.startsWith(`${name} `))?.[1] || null;
 }
 
-// ---------- All challenges ----------
+// "Jan 1 – Dec 31, 2026"
+function dateRange(c) {
+    if (!c.startsOn && !c.endsOn) return "No end date";
+    if (!c.startsOn) return `Until ${fmt.date(c.endsOn)}`;
+    if (!c.endsOn) return `From ${fmt.date(c.startsOn)}`;
+    return `${fmt.date(c.startsOn)} – ${fmt.date(c.endsOn)}`;
+}
+
+const STATE_LABEL = { active: "Active", upcoming: "Upcoming", completed: "Completed", ended: "Ended" };
+
+// ---------- The challenge dashboard ----------
 
 function challengeIndex() {
-    const all = state.challenges;
-    const finished = all.filter((c) => { const p = challengeProgress(c); return p.total && p.done === p.total; }).length;
+    const day = today();
+    const all = state.challenges.map((c) => ({ c, st: challengeState(c, state.books, day), p: challengeProgress(c, state.books) }));
+    const by = (st) => all.filter((x) => x.st === st);
+    const active = by("active");
+    const totals = active.reduce((t, x) => ({ done: t.done + x.p.done, total: t.total + x.p.total }), { done: 0, total: 0 });
 
-    return h("div", {},
-        h("div", { class: "page-head" },
-            h("div", {},
-                h("h1", {}, "Challenges"),
-                h("p", {}, all.length
-                    ? `${fmt.plural(all.length, "challenge")} · ${finished} completed`
-                    : "Set your own reading challenges and fill them book by book")),
-            h("button", { class: "btn btn-primary", type: "button", onclick: openBookPicker }, icon("plus"), "New challenge")
-        ),
-        all.length
-            ? h("div", { class: "challenge-grid" }, all.map(challengeCard))
-            : h("div", { class: "card empty" },
-                h("h3", {}, "No challenges yet"),
-                h("p", {}, "Pick a book or series from your shelf, then create a challenge for it from its Edit details."),
-                h("button", { class: "btn btn-primary", type: "button", onclick: openBookPicker }, "Pick a book or series"))
+    const head = h("div", { class: "page-head" },
+        h("div", {},
+            h("h1", {}, "Challenges"),
+            h("p", {}, all.length
+                ? "Your challenges fill themselves as you finish books that fit."
+                : "Set reading challenges and let your finished books fill them")),
+        h("button", { class: "btn btn-primary", type: "button", onclick: openCreateChallenge }, icon("plus"), "New challenge"));
+
+    if (!all.length) {
+        return h("div", {}, head, h("div", { class: "card empty" },
+            h("h3", {}, "No challenges yet"),
+            h("p", {}, "Pick a template like Genre Explorer, A to Z or Trope Bingo, or write your own spots. "
+                + "Each spot has rules, and books that fit are matched for you."),
+            h("button", { class: "btn btn-primary", type: "button", onclick: openCreateChallenge }, "Create a challenge")));
+    }
+
+    const tabs = ["active", "upcoming", "completed", ...(by("ended").length ? ["ended"] : [])];
+    if (!tabs.includes(view.tab)) view.tab = "active";
+    const tabBar = h("div", { class: "status-tabs", role: "tablist", "aria-label": "Challenge status" },
+        tabs.map((t) => h("button", {
+            type: "button", role: "tab", class: view.tab === t ? "active" : "", "aria-selected": String(view.tab === t),
+            onclick: () => {
+                view.tab = t;
+                document.getElementById("view").replaceChildren(challengeIndex());
+            }
+        }, STATE_LABEL[t], h("span", { class: "count" }, by(t).length))));
+
+    const shown = by(view.tab);
+    return h("div", {}, head,
+        h("div", { class: "stat-summary" },
+            summaryTile("Active", active.length, "challenges running"),
+            summaryTile("Completed", by("completed").length, "challenges finished"),
+            summaryTile("Spots filled", `${totals.done}/${totals.total}`, "in active challenges"),
+            summaryTile("Open spots", totals.total - totals.done, "waiting for a book")),
+        h("section", { class: "section" },
+            tabBar,
+            shown.length
+                ? h("div", { class: "challenge-grid" }, shown.map((x) => challengeCard(x)))
+                : h("div", { class: "card empty-sm" }, `No ${STATE_LABEL[view.tab].toLowerCase()} challenges.`)),
+        active.length ? h("div", { class: "dash-grid section challenge-discovery" }, openSpotsCard(active.map((x) => x.c)), recommendedCard(active.map((x) => x.c))) : null,
+        recentlyUnlockedSection()
     );
 }
 
-function challengeCard(challenge) {
-    const p = challengeProgress(challenge);
-    const complete = p.total && p.done === p.total;
-    return h("a", { class: "card challenge-card", href: challengeHref(challenge.id) },
+function summaryTile(label, value, sub) {
+    return h("div", { class: "card dash-card dash-stat stat-tile" },
+        h("span", { class: "dash-stat-label" }, label),
+        h("span", { class: "dash-stat-value" }, typeof value === "number" ? fmt.num(value) : value),
+        h("span", { class: "dash-stat-sub" }, sub));
+}
+
+function challengeCard({ c, st, p }) {
+    const finishedBooks = c.items.filter((it) => spotDone(it, state.books) && it.bookId).map((it) => getBook(it.bookId)).filter(Boolean);
+    return h("a", { class: `card challenge-card is-${st}`, href: challengeHref(c.id) },
         h("div", { class: "challenge-card-title" },
-            h("h3", {}, challenge.name),
-            complete ? h("span", { class: "badge st-read" }, "Completed") : null),
-        challenge.description ? h("p", { class: "sub" }, challenge.description) : null,
+            h("h3", {}, c.name),
+            st === "completed" ? h("span", { class: "badge st-read" }, icon("check"), "Completed")
+                : st === "upcoming" ? h("span", { class: "badge st-tbr" }, "Upcoming")
+                    : st === "ended" ? h("span", { class: "badge st-dnf" }, "Ended") : null),
+        h("p", { class: "challenge-dates" }, dateRange(c)),
+        c.description ? h("p", { class: "sub" }, c.description) : null,
+        finishedBooks.length ? coverStack(finishedBooks, 6) : null,
         h("div", { class: "series-progress" },
             progressBar(p.percent, { thin: true }),
-            h("small", {}, `${p.done}/${p.total} · ${p.percent}%`)),
-        h("div", { class: "challenge-dots", "aria-hidden": "true" },
-            challenge.items.slice(0, 40).map((item) => {
-                const colour = promptColour(item.label);
-                return h("span", { class: challengeItemDone(item) ? "on" : "", style: colour && !challengeItemDone(item) ? { background: colour, boxShadow: "inset 0 0 0 1px var(--border-strong)" } : null });
-            }))
-    );
+            h("small", {}, `${p.done}/${p.total} spots · ${p.percent}%`)));
 }
 
-// ---------- New challenge: pick a book or series that isn't in a challenge yet ----------
+// Open spots across active challenges, with how many books on the shelf fit each.
+function openSpotsCard(challenges) {
+    const rows = [];
+    for (const c of challenges) {
+        c.items.forEach((item, index) => {
+            if (!spotOpen(item, state.books)) return;
+            const g = suggestionsForSpot(c, index, state.books);
+            rows.push({ c, item, index, ready: g.ready.length, planned: g.planned.length + (item.bookId ? 1 : 0), possible: g.possible.length });
+        });
+    }
+    rows.sort((a, b) => b.ready - a.ready || b.planned - a.planned || b.possible - a.possible);
 
-function openBookPicker() {
-    const used = new Set(state.challenges.flatMap((c) => c.items.map((it) => it.bookId).filter(Boolean)));
-    const books = state.books.filter((b) => !used.has(b.id)).sort((a, b) => a.title.localeCompare(b.title));
-    const series = seriesList()
-        .map((s) => ({ ...s, free: s.books.filter((b) => !used.has(b.id)) }))   // s.books is in reading order
-        .filter((s) => s.free.length)
-        .sort((a, b) => a.name.localeCompare(b.name));
+    return h("section", { class: "card dash-card", "aria-labelledby": "openSpotsTitle" },
+        h("div", { class: "dash-card-head" }, h("h2", { id: "openSpotsTitle" }, "Unfilled spots"), h("span", { class: "hint" }, fmt.plural(rows.length, "spot"))),
+        rows.length
+            ? h("ul", { class: "open-spots" }, rows.slice(0, 8).map((r) => h("li", {},
+                h("button", { type: "button", class: "open-spot", onclick: () => openSpot(r.c.id, r.index) },
+                    h("span", { class: "open-spot-text" }, h("strong", {}, r.item.label), h("small", {}, r.c.name)),
+                    h("span", { class: "open-spot-counts" },
+                        r.ready ? h("span", { class: "count-chip is-ready" }, `${r.ready} ready`) : null,
+                        r.planned ? h("span", { class: "count-chip" }, `${r.planned} on TBR`) : null,
+                        r.possible ? h("span", { class: "count-chip is-possible" }, `${r.possible} possible`) : null,
+                        !r.ready && !r.planned && !r.possible ? h("span", { class: "count-chip is-none" }, hasCriteria(r.item.criteria) ? "find books" : "pick a book") : null),
+                    icon("arrow")))))
+            : h("p", { class: "dash-empty" }, "Every spot is filled. 🎉"));
+}
 
-    // Go to the book and open its Edit details at the Reading challenges section.
-    const pick = (book) => {
-        m.close();
-        location.hash = `#/book/${book.id}`;
-        openEditBook(getBook(book.id), { focus: "challenges" });
-    };
+// Books on the TBR / reading now that would fill the most open spots.
+function recommendedCard(challenges) {
+    const fits = new Map(); // bookId -> { book, spots: [{c, item, index, match}] }
+    for (const c of challenges) {
+        const used = new Set(c.items.map((it) => it.bookId).filter(Boolean));
+        c.items.forEach((item, index) => {
+            if (!spotOpen(item, state.books) || item.bookId || !hasCriteria(item.criteria)) return;
+            for (const book of state.books) {
+                if (book.status === "Read" || book.status === "DNF" || used.has(book.id)) continue;
+                const match = matchSpot(book, item.criteria);
+                if (match.status !== "confirmed") continue;
+                if (!fits.has(book.id)) fits.set(book.id, { book, spots: [] });
+                fits.get(book.id).spots.push({ c, item, index, match });
+            }
+        });
+    }
+    const list = [...fits.values()].sort((a, b) => b.spots.length - a.spots.length || a.book.title.localeCompare(b.book.title)).slice(0, 5);
 
-    const search = h("input", { class: "input", type: "search", placeholder: "Search title, author or series", "aria-label": "Search books and series", autocomplete: "off" });
-    const list = h("div", { class: "picker-list" });
+    return h("section", { class: "card dash-card", "aria-labelledby": "recoTitle" },
+        h("div", { class: "dash-card-head" }, h("h2", { id: "recoTitle" }, "Recommended from your shelf")),
+        list.length
+            ? h("ul", { class: "reco-list" }, list.map(({ book, spots }) => h("li", {},
+                h("a", { class: "reco", href: `#/book/${book.id}` },
+                    cover(book, "sm"),
+                    h("span", { class: "reco-text" },
+                        h("strong", {}, book.title),
+                        h("small", {}, `${book.status} · fits ${fmt.plural(spots.length, "spot")}`),
+                        h("span", { class: "reason-chips" }, spots.slice(0, 3).map((s) => h("span", { class: "reason-chip" }, `${s.c.name}: ${s.item.label}`))))))))
+            : h("p", { class: "dash-empty" }, "None of your TBR books fits an open spot yet. Open a spot to find new ideas."));
+}
 
-    const render = () => {
-        const q = search.value.trim().toLowerCase();
-        const hit = (...values) => !q || values.some((v) => (v || "").toLowerCase().includes(q));
-        const s = series.filter((x) => hit(x.name, ...x.authors));
-        const b = books.filter((x) => hit(x.title, x.author, x.series));
+// Spots filled most recently with a finished book.
+function recentlyUnlockedSection() {
+    const unlocked = [];
+    for (const c of state.challenges) {
+        for (const item of c.items) {
+            const book = item.bookId ? getBook(item.bookId) : null;
+            if (!book || book.status !== "Read") continue;
+            const when = [item.assignedAt?.slice(0, 10), book.dateFinished].filter(Boolean).sort().pop() || "";
+            unlocked.push({ c, item, book, when });
+        }
+    }
+    unlocked.sort((a, b) => b.when.localeCompare(a.when));
+    if (!unlocked.length) return null;
 
-        // replaceChildren() doesn't flatten arrays or skip nulls (h() does), so do it here.
-        list.replaceChildren(...[
-            s.length ? h("h3", { class: "picker-head" }, "Series") : null,
-            s.map((x) => h("button", { type: "button", class: "picker-row", onclick: () => pick(x.free[0]) },
-                coverStack(x.free, 3),
-                h("span", { class: "picker-text" },
-                    h("strong", {}, x.name),
-                    h("small", {}, `${fmt.plural(x.free.length, "book")} not in a challenge · opens ${x.free[0].title}`)),
-                icon("arrow"))),
-            b.length ? h("h3", { class: "picker-head" }, "Books") : null,
-            b.map((x) => h("button", { type: "button", class: "picker-row", onclick: () => pick(x) },
-                cover(x, "xs"),
-                h("span", { class: "picker-text" },
-                    h("strong", {}, x.title),
-                    h("small", {}, [x.author, x.series ? seriesLabel(x) : null].filter(Boolean).join(" · "))),
-                icon("arrow"))),
-            !s.length && !b.length
-                ? h("p", { class: "empty-sm" }, !state.books.length ? "Add some books to your shelf first."
-                    : !books.length ? "Every book on your shelf is already in a challenge." : "Nothing matches that search.")
-                : null
-        ].flat().filter(Boolean));
-    };
-    search.addEventListener("input", render);
-    render();
-
-    const m = modal({
-        title: "New challenge",
-        body: h("div", { class: "stack" },
-            h("p", { class: "hint" }, "Choose a book or series that isn't in a challenge yet. Its Edit details opens so you can add it to a challenge or create a new one."),
-            search,
-            list),
-        initialFocus: search
-    });
+    return h("section", { class: "section" },
+        h("div", { class: "section-head" }, h("h2", {}, "Recently unlocked")),
+        h("ul", { class: "unlocked-list" }, unlocked.slice(0, 6).map((u) => h("li", {},
+            h("a", { class: "unlocked", href: challengeHref(u.c.id) },
+                cover(u.book, "sm"),
+                h("span", { class: "unlocked-check", "aria-hidden": "true" }, icon("check")),
+                h("span", { class: "unlocked-text" },
+                    h("strong", {}, u.item.label),
+                    h("small", {}, u.c.name),
+                    h("small", {}, u.book.title, u.when ? ` · ${fmt.date(u.when)}` : "")))))));
 }
 
 // ---------- One challenge: the board ----------
@@ -162,17 +220,9 @@ function challengeBoard(id) {
             h("a", { class: "btn", href: "#/challenges" }, "All challenges")));
     }
 
-    const p = challengeProgress(challenge);
-    const complete = p.total && p.done === p.total;
-
-    const newPrompt = h("input", { class: "input", placeholder: "Add a prompt, e.g. Red, or A book with a map", "aria-label": "New prompt", maxlength: 200 });
-    const addForm = h("form", { class: "challenge-add" }, newPrompt, h("button", { class: "btn", type: "submit" }, icon("plus"), "Add prompt"));
-    addForm.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const label = newPrompt.value.trim();
-        if (!label) return newPrompt.focus();
-        run(() => updateChallenge(challenge.id, { items: [...challenge.items, { label, bookId: null, done: false }] }), "Prompt added");
-    });
+    const p = challengeProgress(challenge, state.books);
+    const st = challengeState(challenge, state.books, today());
+    const fills = proposeFills(challenge, state.books).length;
 
     return h("div", {},
         back,
@@ -182,128 +232,66 @@ function challengeBoard(id) {
                 h("button", {
                     class: "icon-btn", type: "button", "aria-label": "Delete challenge", title: "Delete",
                     onclick: async () => {
-                        const ok = await confirmDialog({ title: "Delete this challenge?", text: `"${challenge.name}" and its prompts will be removed. Your books aren't affected.` });
+                        const ok = await confirmDialog({ title: "Delete this challenge?", text: `"${challenge.name}" and its spots will be removed. Your books aren't affected.` });
                         if (!ok) return;
-                        await run(async () => {
+                        try {
                             await deleteChallenge(challenge.id);
                             location.hash = "#/challenges";
-                        }, "Challenge deleted");
+                            toast("Challenge deleted");
+                        } catch (error) {
+                            toast(error.message, { error: true });
+                        }
                     }
                 }, icon("trash"))),
             h("h1", { class: "board-title" }, challenge.name),
             challenge.description ? h("p", { class: "board-kind" }, challenge.description) : null,
+            h("p", { class: "board-dates" },
+                dateRange(challenge), " · ", STATE_LABEL[st],
+                challenge.autoMatch === false ? " · automatic matching off" : ""),
             h("div", { class: "board-progress" },
                 progressBar(p.percent),
                 h("span", { class: "board-count" }, `${p.done}/${p.total} · ${p.percent}%`)),
-            complete ? h("p", { class: "board-done" }, "Challenge complete! 🎉") : null,
-            h("ol", { class: "board-slots" }, challenge.items.map((item, i) => slot(challenge, item, i))),
-            addForm
+            st === "completed" ? h("p", { class: "board-done" }, "Challenge complete! 🎉") : null,
+            fills ? h("button", { type: "button", class: "btn btn-sage board-fill", onclick: () => openFillReview(challenge.id) },
+                icon("check"), `${fmt.plural(fills, "spot")} can be filled from books you've read`) : null,
+            h("ol", { class: "board-slots" },
+                challenge.items.map((item, i) => slot(challenge, item, i)),
+                h("li", { class: "board-slot" },
+                    h("span", { class: "slot-label", "aria-hidden": "true" }, "New spot"),
+                    h("button", { type: "button", class: "slot-btn", "aria-label": "Add a spot", onclick: () => openSpotEditor(challenge.id, null) },
+                        h("span", { class: "slot-box slot-add" }, h("span", { class: "slot-plus is-on" }, icon("plus"))))))
         )
     );
 }
 
 function slot(challenge, item, index) {
     const book = item.bookId ? getBook(item.bookId) : null;
-    const done = challengeItemDone(item);
+    const done = spotDone(item, state.books);
     const colour = promptColour(item.label);
+    const g = done ? null : suggestionsForSpot(challenge, index, state.books);
+    const hint = !done && !book && g
+        ? g.ready.length ? { cls: "is-ready", text: `${g.ready.length} ready` }
+            : g.planned.length ? { cls: "", text: `${g.planned.length} on TBR` }
+                : g.possible.length ? { cls: "is-possible", text: `${g.possible.length} possible` } : null
+        : null;
 
-    const art = book
-        ? cover(book, "md")
-        : h("span", { class: "slot-empty" }, h("span", { class: "slot-plus" }, icon("plus")));
+    const art = book ? cover(book, "md") : h("span", { class: "slot-empty" }, h("span", { class: "slot-plus" }, icon("plus")));
     const box = h("span", { class: "slot-box", style: !book && colour ? { background: colour } : null }, art,
         done ? h("span", { class: "slot-check", "aria-hidden": "true" }, icon("check")) : null,
-        book && !done ? h("span", { class: "slot-status" }, book.status) : null);
+        book && !done ? h("span", { class: "slot-status" }, `Planned · ${book.status}`) : null,
+        hint ? h("span", { class: `slot-hint ${hint.cls}` }, hint.text) : null);
     if (!book && !colour) box.classList.add(`slot-tint-${index % 3}`);
     if (!book && colour && DARK_COLOURS.has(colour)) box.classList.add("is-dark");
 
-    const name = [item.label, book ? book.title : "no book yet", done ? "done" : null].filter(Boolean).join(", ");
+    const name = [item.label, book ? book.title : "no book yet", done ? "done" : book ? "planned" : null, hint?.text].filter(Boolean).join(", ");
     return h("li", { class: `board-slot${done ? " is-done" : ""}` },
         h("span", { class: "slot-label", "aria-hidden": "true" }, item.label),
-        h("button", { type: "button", class: "slot-btn", "aria-label": name, onclick: () => openSlot(challenge, index) }, box),
-        book ? h("span", { class: "slot-title" }, book.title) : null
+        h("button", { type: "button", class: "slot-btn", "aria-label": name, onclick: () => openSpot(challenge.id, index) }, box),
+        book ? h("span", { class: "slot-title" }, book.title) : h("span", { class: "slot-rules" }, ruleSummary(item))
     );
 }
 
-// Titles that start with the prompt's letter come first ("The Hobbit" counts for H as well as T).
-function bookOptions(label, selectedId) {
-    const letter = /^[a-z]$/i.test(label) ? label.toUpperCase() : null;
-    const books = [...state.books].sort((a, b) => a.title.localeCompare(b.title));
-    const starts = (b) => {
-        const t = b.title.trim().toUpperCase();
-        return t.startsWith(letter) || t.replace(/^(THE|AN|A)\s+/, "").startsWith(letter);
-    };
-    const option = (b) => h("option", { value: b.id, selected: b.id === selectedId }, `${b.title} — ${b.author}`);
-    const suggested = letter ? books.filter(starts) : [];
-
-    return [
-        h("option", { value: "" }, "No book yet"),
-        suggested.length ? h("optgroup", { label: `Starts with ${letter}` }, suggested.map(option)) : null,
-        h("optgroup", { label: suggested.length ? "All books" : "Your books" }, books.map(option))
-    ];
-}
-
-// Click a slot: link a book, mark it done, or remove the prompt.
-function openSlot(challenge, index) {
-    const item = challenge.items[index];
-    const book = item.bookId ? getBook(item.bookId) : null;
-
-    const select = h("select", { class: "select", id: "slotBook" }, bookOptions(item.label, book?.id));
-    const done = h("input", { type: "checkbox", id: "slotDone", checked: item.done });
-    const autoDone = book?.status === "Read";
-
-    const removeBtn = h("button", {
-        type: "button", class: "link-btn left danger-link",
-        onclick: async () => {
-            if (challenge.items.length === 1) return toast("A challenge needs at least one prompt.", { error: true });
-            m.close();
-            const ok = await confirmDialog({ title: "Remove this prompt?", text: `"${item.label}" will be removed from the challenge.`, okLabel: "Remove" });
-            if (ok) await run(() => updateChallenge(challenge.id, { items: challenge.items.filter((_, i) => i !== index) }), "Prompt removed");
-        }
-    }, "Remove prompt");
-
-    const m = modal({
-        title: item.label,
-        size: "sm",
-        submitLabel: "Save",
-        body: h("div", { class: "stack" },
-            book ? h("a", { class: "slot-preview", href: `#/book/${book.id}`, onclick: () => m.close() },
-                cover(book, "xs"),
-                h("span", {}, h("strong", {}, book.title), h("small", {}, book.author)),
-                statusBadge(book.status)) : null,
-            h("div", { class: "field" }, h("label", { for: "slotBook" }, book ? "Change book" : "Book for this prompt"), select),
-            h("label", { class: "check", for: "slotDone" }, done,
-                h("span", {}, "Mark as done",
-                    h("small", {}, autoDone ? "Already done: the book is marked Read" : "Or it's done automatically once the book is marked Read")))
-        ),
-        footer: [removeBtn],
-        initialFocus: select,
-        async onSubmit() {
-            const changes = { bookId: select.value || null, done: done.checked };
-            if (changes.bookId === item.bookId && changes.done === item.done) return;
-            await updateChallenge(challenge.id, { items: challenge.items.map((it, i) => (i === index ? { ...it, ...changes } : it)) });
-            toast(changes.bookId !== item.bookId ? (changes.bookId ? "Book linked" : "Book unlinked") : "Prompt saved");
-        }
-    });
-}
-
-// ---------- Edit name / kind ----------
-
-function openEditChallenge(challenge) {
-    const name = h("input", { class: "input", id: "chName", maxlength: 120, autocomplete: "off", value: challenge.name });
-    const kind = h("textarea", { class: "textarea", id: "chKind", rows: 2, maxlength: 1000, placeholder: "e.g. Read a book with a cover of every colour" }, challenge.description);
-
-    modal({
-        title: "Edit challenge",
-        size: "sm",
-        submitLabel: "Save",
-        body: h("div", { class: "stack" },
-            h("div", { class: "field" }, h("label", { for: "chName" }, "Challenge title"), name),
-            h("div", { class: "field" }, h("label", { for: "chKind" }, "What kind of challenge is it?"), kind)),
-        initialFocus: name,
-        async onSubmit({ setError }) {
-            if (!name.value.trim()) return setError("Give your challenge a title."), false;
-            await updateChallenge(challenge.id, { name: name.value.trim(), description: kind.value.trim() });
-            toast("Challenge saved");
-        }
-    });
+// One short line under an empty slot: whether books are matched for you or picked by hand.
+function ruleSummary(item) {
+    return hasCriteria(item.criteria) ? "Matched for you" : "You pick";
 }
