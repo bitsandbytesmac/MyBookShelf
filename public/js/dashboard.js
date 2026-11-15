@@ -5,7 +5,7 @@ import {
     genreOptions, GOAL_FILTER_LABELS, FORMATS, AGE_CATEGORIES, getBook,
     nextUpBooks, saveNextUp, NEXT_UP_MAX, readingDays, readingStreak, today
 } from "./store.js";
-import { h, icon, cover, progressBar, fmt, toast, modal, confirmDialog } from "./ui.js";
+import { h, icon, cover, coverStack, progressBar, fmt, toast, modal, confirmDialog } from "./ui.js";
 import { openAddBook } from "./dialogs.js";
 import { openCustomize } from "./theme.js";
 import { openLogReading } from "./logReading.js";
@@ -76,8 +76,8 @@ export function renderDashboard() {
     return h("div", {}, head,
         h("div", { class: "dash-board" },
             currentlyReadingCard(),
-            statCard("dash-tbr", "TBR", count("To Be Read"), "books in your TBR", "#/library?status=To%20Be%20Read"),
-            statCard("dash-done", "Completed", count("Read"), "books finished", "#/library?status=Read"),
+            statCard("dash-tbr", "TBR", count("To Be Read"), "books in your TBR", "#/library?status=To%20Be%20Read", tbrCovers()),
+            statCard("dash-done", "Completed", count("Read"), "books finished", "#/library?status=Read", finishedCovers()),
             streakCard(),
             goalsCard(),
             quoteCard(),
@@ -123,11 +123,26 @@ function currentlyReadingCard() {
     return card;
 }
 
-function statCard(cls, label, value, sub, href) {
+// books (optional): a few covers fanned out under the count, like the challenge cards.
+function statCard(cls, label, value, sub, href, books = []) {
     return h("a", { class: `card dash-card dash-stat ${cls}`, href },
         h("span", { class: "dash-stat-label" }, label),
         h("span", { class: "dash-stat-value" }, fmt.num(value)),
-        h("span", { class: "dash-stat-sub" }, sub));
+        h("span", { class: "dash-stat-sub" }, sub),
+        books.length ? coverStack(books, 5) : null);
+}
+
+// Next Up picks first, then the most recently added To Be Read books.
+function tbrCovers() {
+    const next = nextUpBooks();
+    const rest = state.books.filter((b) => b.status === "To Be Read" && !next.includes(b)).sort((a, b) => Number(b.id) - Number(a.id));
+    return [...next, ...rest];
+}
+
+// Most recently finished first.
+function finishedCovers() {
+    return state.books.filter((b) => b.status === "Read")
+        .sort((a, b) => (b.dateFinished || "").localeCompare(a.dateFinished || "") || Number(b.id) - Number(a.id));
 }
 
 // ---------- Streak + this month's calendar ----------

@@ -112,6 +112,57 @@ test.describe("Dashboard", () => {
         await expect(page.locator(".book-hero .badge").first()).toHaveText("Read");
     });
 
+    test("TBR and Completed cards show their book covers", async ({ page, api }) => {
+        for (const t of ["T1", "T2", "T3"]) await api.createBook({ title: t });
+        await api.createBook({ title: "Done A", status: "Read", dateFinished: today() });
+        await page.goto("/index.html#/dashboard");
+        await expect(page.locator(".dash-tbr .cover-stack .cover")).toHaveCount(3);
+        await expect(page.locator(".dash-done .cover-stack .cover")).toHaveCount(1);
+        await expect(page.locator(".dash-tbr .cover-stack .cover").first()).toContainText("T3"); // newest first
+    });
+
+    test("a book added after it was already read doesn't log a session or count toward the streak", async ({ page, api }) => {
+        const book = await api.createBook({ title: "Read Last Year", totalPages: 300 });
+        await page.goto(`/index.html#/book/${book.id}`);
+        await page.getByLabel("Book status").selectOption("Read");
+        await expectToast(page, "Moved to Read");
+        await expect(page.locator(".sessions")).toHaveCount(0);
+        await expect(page.getByText("No journal entries yet.")).toBeVisible();
+
+        await page.goto("/index.html#/dashboard");
+        await expect(page.locator(".dash-done .dash-stat-value")).toHaveText("1");
+        await expect(card(page, "Reading Streak").locator(".streak-pill strong")).toHaveText("0");
+        await expect(card(page, "Most Recent Entries")).toContainText("Your journal entries will show up here.");
+        const stats = await (await page.request.get("/api/activities/statistics")).json();
+        expect(stats.data.readingDays).toEqual([]);
+    });
+
+    test("deleting a book removes its journal entries and updates the streak", async ({ page, api }) => {
+        const keep = await api.createBook({ title: "Keeper", status: "Reading", totalPages: 300, currentPage: 10 });
+        const gone = await api.createBook({ title: "Goner", status: "Reading", totalPages: 300, currentPage: 10 });
+        await logViaApi(page, keep, 20, daysAgo(3), "older entry");
+        await logViaApi(page, gone, 40, today(), "today's entry");
+
+        await page.goto("/index.html#/dashboard");
+        const entries = card(page, "Most Recent Entries").locator(".entry");
+        await expect(entries).toHaveCount(2);
+        await expect(card(page, "Reading Streak").locator(".streak-pill strong")).toHaveText("1");
+
+        await page.goto(`/index.html#/book/${gone.id}`);
+        await page.getByRole("button", { name: "Delete book" }).click();
+        await dialog(page, "Delete this book?").getByRole("button", { name: "Delete" }).click();
+        await expect(page).toHaveURL(/#\/library$/);
+
+        await page.goto("/index.html#/dashboard");
+        await expect(entries).toHaveCount(1);
+        await expect(entries.first()).toContainText("Keeper");
+        await expect(card(page, "Most Recent Entries")).not.toContainText("Goner");
+        // Today's only session belonged to the deleted book, so today no longer counts.
+        await expect(card(page, "Reading Streak").locator(".streak-pill strong")).toHaveText("0");
+        const acts = await (await page.request.get("/api/activities")).json();
+        expect(acts.data.map((a: { book_title: string }) => a.book_title)).toEqual(["Keeper"]);
+    });
+
     test("the streak counts back-to-back days and the calendar marks them", async ({ page, api }) => {
         const book = await api.createBook({ title: "Streaky", status: "Reading", totalPages: 300, currentPage: 10 });
         await logViaApi(page, book, 20, daysAgo(4));

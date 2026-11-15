@@ -23,7 +23,7 @@ test("pages fit a phone screen and the bottom nav shows all six tabs", async ({ 
     }
 
     const tabs = page.locator("nav.tabs .tab");
-    await expect(tabs).toHaveText(["Dashboard", "Library", "Authors", "Series", "Challenges", "Statistics"]);
+    await expect(tabs).toHaveText(["Dashboard", "Library", "Authors", "Series", "Statistics", "Challenges"]);
     for (const tab of await tabs.all()) {
         const box = await tab.boundingBox();
         expect(box!.x).toBeGreaterThanOrEqual(0);

@@ -238,7 +238,7 @@ export async function updateBook(req, res) {
         await client.query("BEGIN");
 
         const existing = await client.query(
-            "SELECT current_page, cover_url FROM books WHERE id = $1 AND user_id = $2 FOR UPDATE",
+            "SELECT current_page, cover_url, status FROM books WHERE id = $1 AND user_id = $2 FOR UPDATE",
             [req.params.id, req.user.id]
         );
 
@@ -248,6 +248,7 @@ export async function updateBook(req, res) {
         }
 
         const previousPage = Number(existing.rows[0].current_page) || 0;
+        const previousStatus = existing.rows[0].status;
         const assignments = COLUMNS.map((c, i) => `${c} = $${i + 1}`).join(", ");
         const params = [...COLUMNS.map((c) => values[c]), req.params.id, req.user.id];
 
@@ -259,7 +260,11 @@ export async function updateBook(req, res) {
         );
 
         // Log a reading session (journal entry) whenever the page count goes up, or a note was written.
-        if (values.current_page > previousPage || session.note) {
+        // Exception: marking a never-started (To Be Read) book as Read just records a book read in the past
+        // (e.g. one added after finishing it). Its page jumps to the end, but that isn't reading done today,
+        // so it must not create an entry or count toward the streak. An explicit "Log your reading" still does.
+        const finishedBefore = previousStatus === "To Be Read" && values.status === "Read" && !session.date && !session.note;
+        if ((values.current_page > previousPage && !finishedBefore) || session.note) {
             await client.query(
                 `INSERT INTO reading_activities (user_id, book_id, book_title, previous_page, current_page, pages_read, session_date, note)
                  VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, CURRENT_DATE), $8)`,
@@ -288,19 +293,28 @@ export async function updateBook(req, res) {
 
 // DELETE - remove a book
 export async function deleteBook(req, res) {
+    let client;
     try {
-        const deleted = await pool.query(
+        client = await pool.connect();
+        await client.query("BEGIN");
+
+        // Its journal entries go too (the foreign key would only blank their book link, so they'd linger in
+        // Most Recent Entries and keep counting toward the streak).
+        await client.query("DELETE FROM reading_activities WHERE book_id = $1 AND user_id = $2", [req.params.id, req.user.id]);
+
+        const deleted = await client.query(
             "DELETE FROM books WHERE id = $1 AND user_id = $2 RETURNING id, cover_url",
             [req.params.id, req.user.id]
         );
-
-        if (deleted.rows.length === 0) return sendError(res, 404, "Book not found.");
+        if (deleted.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return sendError(res, 404, "Book not found.");
+        }
 
         const { cover_url: cover, ...data } = deleted.rows[0];
-        await deleteUnusedCovers([cover], req.user.id);
 
         // Free any challenge spot this book filled (the spot stays, empty).
-        await pool.query(
+        await client.query(
             `UPDATE challenges
              SET items = (
                  SELECT COALESCE(jsonb_agg(
@@ -312,9 +326,15 @@ export async function deleteBook(req, res) {
             [String(data.id), req.user.id]
         );
 
+        await client.query("COMMIT");
+
+        await deleteUnusedCovers([cover], req.user.id);
         res.json({ message: "Book deleted successfully!", status: "success", data });
     } catch (error) {
+        if (client) await client.query("ROLLBACK").catch(() => {});
         console.error("Error deleting book:", error);
         sendError(res, 500, "Failed to delete book.");
+    } finally {
+        client?.release();
     }
 }

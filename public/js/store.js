@@ -221,7 +221,10 @@ export async function deleteBook(id) {
     for (const c of state.challenges) {
         c.items = c.items.map((it) => (it.bookId === String(id) ? { ...it, bookId: null, assignedAt: undefined } : it));
     }
+    // Its journal entries were deleted too: drop them now, then reload the streak days and page totals.
+    state.activities = state.activities.filter((a) => String(a.book_id) !== String(id));
     emit();
+    await refreshActivity();
 }
 
 // "A book was just finished": the challenge module listens so it can offer the spots the book unlocks.

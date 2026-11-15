@@ -566,6 +566,9 @@ a.menu-item { color: var(--text); }
 .dash-stat-sub { font-size: 13px; color: var(--text-2); }
 .dash-done { background: var(--sage-soft); border-color: transparent; }
 .dash-done .dash-stat-value { color: var(--sage-deep); }
+.dash-stat .cover-stack { margin-top: 10px; }
+.dash-stat .cover-stack .cover { width: 34px; margin-right: -10px; }
+.dash-done .cover-stack .cover { outline-color: var(--sage-soft); }
 
 .streak-body { display: flex; gap: 16px; align-items: stretch; }
 .streak-pill {
