@@ -14,6 +14,7 @@ export type BookInput = {
     totalPages?: number;
     currentPage?: number;
     format?: string;
+    isPhysical?: boolean;
     dateStarted?: string;
     dateFinished?: string;
 };

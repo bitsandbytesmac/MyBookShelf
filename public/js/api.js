@@ -104,6 +104,7 @@ export function normalizeBook(row) {
         isFavorite: Boolean(row.is_favorite),
         reviewed: Boolean(row.reviewed),
         journaled: Boolean(row.journaled),
+        isPhysical: Boolean(row.is_physical),
         createdAt: row.created_at || null
     };
 }
@@ -141,7 +142,8 @@ function toPayload(book) {
         dateFinished: book.dateFinished || null,
         isFavorite: Boolean(book.isFavorite),
         reviewed: Boolean(book.reviewed),
-        journaled: Boolean(book.journaled)
+        journaled: Boolean(book.journaled),
+        isPhysical: Boolean(book.isPhysical)
     };
 }
 

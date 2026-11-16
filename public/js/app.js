@@ -4,6 +4,7 @@ import { loadAll, subscribe, state, today } from "./store.js";
 import { openLogReading } from "./logReading.js";
 import { renderDashboard, currentUser } from "./dashboard.js";
 import { renderLibrary } from "./library.js";
+import { renderPhysical } from "./physical.js";
 import { renderBookPage } from "./bookPage.js";
 import { renderAuthors, renderAuthor } from "./authors.js";
 import { renderSeries } from "./series.js";
@@ -18,6 +19,7 @@ const view = document.getElementById("view");
 const ROUTES = {
     dashboard: { render: renderDashboard, title: () => "Dashboard", tab: "dashboard" },
     library: { render: renderLibrary, title: () => "Library", tab: "library" },
+    physical: { render: renderPhysical, title: () => "Physical Books", tab: "physical" },
     book: { render: renderBookPage, title: () => document.querySelector(".book-hero h1")?.textContent || "Book", tab: "library" },
     authors: { render: renderAuthors, title: () => "Authors", tab: "authors" },
     author: { render: renderAuthor, title: () => document.querySelector(".author-hero h1")?.textContent || "Author", tab: "authors" },

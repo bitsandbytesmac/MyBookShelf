@@ -424,7 +424,8 @@ function openManualAdd(prefillTitle = "") {
         seriesFields({}, "m"),
         h("div", { class: "field" }, h("label", { for: "mSummary" }, "Summary"),
             h("textarea", { class: "textarea", id: "mSummary", rows: 4, placeholder: "What's it about?" })),
-        textField("mPages", "Total pages", "", { type: "number", min: 0, inputmode: "numeric" })
+        textField("mPages", "Total pages", "", { type: "number", min: 0, inputmode: "numeric" }),
+        checkbox("mPhysical", "Physical book", false, "Shows it in Physical Books")
     );
 
     modal({
@@ -447,6 +448,7 @@ function openManualAdd(prefillTitle = "") {
                 series: series.series, seriesNumber: series.seriesNumber, seriesTotal: series.seriesTotal,
                 summary: body.querySelector("#mSummary").value.trim(),
                 totalPages: pages,
+                isPhysical: body.querySelector("#mPhysical").checked,
                 coverUrl: await picker.resolve()
             });
         }
@@ -492,6 +494,7 @@ export function openEditBook(book) {
             selectField("eFormat", "Format", FORMATS, book.format, { blank: "—" }),
             selectField("eOwnership", "Status", OWNERSHIP, book.ownership, { blank: "—" })
         ),
+        checkbox("ePhysical", "Physical book", book.isPhysical, "Shows it in Physical Books"),
         h("div", { class: "field-row" },
             h("div", { class: "field" }, h("label", { for: "eTotal" }, "Total pages"), total),
             h("div", { class: "field" }, h("label", { for: "eCurrent" }, "Page I'm on"), current)
@@ -541,6 +544,7 @@ export function openEditBook(book) {
                 status: body.querySelector("#eStatus").value,
                 format: body.querySelector("#eFormat").value,
                 ownership: body.querySelector("#eOwnership").value,
+                isPhysical: body.querySelector("#ePhysical").checked,
                 ageCategory: body.querySelector("#eAge").value,
                 totalPages, currentPage,
                 genres: genres.value,

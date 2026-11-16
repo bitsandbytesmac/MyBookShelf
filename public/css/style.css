@@ -1713,3 +1713,13 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* ---------- Physical Books ---------- */
+a.badge { text-decoration: none; }
+a.badge.meta:hover { border-color: var(--rose); color: var(--rose-deep); }
+
+/* Seven tabs share the phone's bottom bar. */
+@media (max-width: 640px) {
+    .tabs { padding-left: 4px; padding-right: 4px; }
+    .tab { font-size: 10.5px; padding: 0 1px; letter-spacing: -0.01em; line-height: 1.1; text-align: center; }
+}

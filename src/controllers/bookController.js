@@ -136,6 +136,7 @@ function parseBook(body = {}) {
     values.is_favorite = Boolean(body.isFavorite);
     values.reviewed = Boolean(body.reviewed);
     values.journaled = Boolean(body.journaled);
+    values.is_physical = Boolean(body.isPhysical);              // shown on the Physical Bookshelf
     values.genre = values.genres[0] || "";                     // legacy single-genre column
     values.completed_at = values.date_finished;                 // legacy completion column
 
@@ -146,7 +147,7 @@ const COLUMNS = [
     "title", "author", "summary", "cover_url", "series", "series_number", "series_total", "genres", "subgenres",
     "format", "ownership", "age_category", "tropes", "content_warnings", "themes", "settings", "characters", "published_year", "status",
     "total_pages", "current_page", "rating", "spice", "quotes", "review", "personal_notes",
-    "date_started", "date_finished", "is_favorite", "reviewed", "journaled", "genre", "completed_at"
+    "date_started", "date_finished", "is_favorite", "reviewed", "journaled", "is_physical", "genre", "completed_at"
 ];
 
 // The series total belongs to the whole series, so copy it to the user's other books in the same series.

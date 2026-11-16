@@ -76,6 +76,7 @@ function hero(book) {
                 statusBadge(book.status),
                 book.format ? h("span", { class: "badge meta" }, book.format) : null,
                 book.ownership ? h("span", { class: "badge meta" }, book.ownership) : null,
+                book.isPhysical ? h("a", { class: "badge meta", href: "#/physical" }, "Physical book") : null,
                 book.ageCategory ? h("span", { class: "badge meta" }, book.ageCategory) : null,
                 book.genres.map((g) => h("span", { class: "badge tag" }, g)),
                 book.subgenres.map((g) => h("span", { class: "badge tag-sub" }, g))
