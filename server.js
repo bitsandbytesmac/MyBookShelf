@@ -40,8 +40,9 @@ app.use(express.json());
 // Logins live in a cookie now, so refuse change requests that come from other websites.
 app.use("/api", sameOriginOnly);
 
-// Serve frontend files
-app.use(express.static('public'));
+// Serve frontend files. STATIC_DIR lets the tests serve the React build (client/dist) during the
+// migration; production never sets it (on Vercel, static files don't go through Express anyway).
+app.use(express.static(process.env.STATIC_DIR || 'public'));
 
 // Serve the homepage when users visit the root URL
 app.get("/", (req, res) => {

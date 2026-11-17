@@ -48,6 +48,18 @@ $env:DATABASE_URL = "<neon connection string>"; npm run migrate; Remove-Item Env
 - Password reset (`passwordResetController.js`): SHA-256-hashed single-use tokens, 1-hour expiry, 60 s resend throttle, always a generic reply. Email links never use the request's Host header.
 - The Google Books search endpoint requires login (it spends the API key quota).
 
+## React migration (in progress)
+
+The frontend is being moved to React + TypeScript (Vite) in `client/`, with the owner's approval of this plan: build alongside, one cutover at the end; keep hash URLs; keep `style.css` unchanged; no router/state/CSS libraries. **Production still serves the vanilla app in `public/`**; nothing in `client/` ships until the cutover phase. Phases: 0 scaffold (done), 1 foundations (API/store/domain/shared UI/layout/theme; done), 2 auth pages, 3 library and books, 4 Physical Books/authors/series, 5 dashboard and journal, 6 statistics and recap, 7 challenges, 8 responsive pass, 9 cutover (Vercel runs the build; owner checks a preview deploy first).
+
+- `npm run dev` (API on :3000) + `npm run dev:client` (Vite on :5173, proxies `/api` with `changeOrigin` off so `sameOriginOnly` still matches Origin to Host). `npm run build:client` -> `client/dist`; `npm run typecheck:client`.
+- Don't add a script named `build` before the cutover: Vercel runs it automatically on `main`.
+- `client/src/main.tsx` imports `public/css/style.css` directly (one copy until cutover). `client/public` holds copies of `favicon.svg` and `js/theme-boot.js`; edit both copies until the cutover.
+- Layout of `client/src`: `api/` (typed fetch wrapper with the same 401 = logout rule, `mappers.ts` with `normalizeBook`/`toPayload`; `toPayload` is typed against `Book`, so a field added to `Book` and not sent is a compile error), `domain/` (pure logic: `readingRules`, `shelf` (authors/series), `goals` (+ streak), `challengeMatch`, `dates`, `constants`; functions take the books as arguments instead of reading global state), `store/` (same mutations as `public/js/store.js`, but **state is replaced, never mutated**; read it with `useStore(selector)`, where the selector returns a slice that's already in the state, and derive lists with `useMemo`), `components/` (`Modal` + `openDialog`/`confirmDialog`, `toast`, covers, badges, bookcase, rate/multi-select inputs, `Icon`, `fmt`), `features/<area>/`, `app/` (shell, hash router, nav, account menu, `actions.ts` for the nav's Add/Log buttons, placeholders until Phases 3 and 5).
+- Dialogs: `openDialog((done) => <SomeDialog onClose={done} />)`; the dialog renders `<Modal onClose={...} onSubmit={...}>` with the same `dialog > form.dialog-form` markup as `modal()`. `onSubmit` returning `false` keeps it open; a thrown error shows in `.form-error`.
+- Until the cutover the challenge rules exist twice (`public/js/challengeMatch.js` and `client/src/domain/challengeMatch.ts`); `e2e/matching.spec.ts` runs every case against both, so change both together.
+- `npm run test:e2e:react` runs the **same** Playwright tests against the React build (`playwright.react.config.ts`: builds, then serves `client/dist` via `STATIC_DIR`). A phase is done when its specs pass there as well as in `npm run test:e2e`. Keep the markup, classes, roles and labels of the vanilla app so the specs carry over.
+
 ## Frontend architecture (`public/`)
 
 - Plain ES modules, no framework. Pages: `index.html` (the app) plus standalone `login`, `register`, `forgot-password`, `reset-password`, `privacy` and `terms` pages (`auth.js` drives the auth pages). If a framework is ever needed, the owner wants **React**.
