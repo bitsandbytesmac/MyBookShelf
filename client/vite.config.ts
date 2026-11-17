@@ -11,7 +11,14 @@ export default defineConfig({
     plugins: [react()],
     build: {
         outDir: "dist",
-        emptyOutDir: true
+        emptyOutDir: true,
+        // Same page URLs as public/: the app, the four sign-in pages and the two legal pages.
+        rollupOptions: {
+            input: Object.fromEntries(
+                ["index", "login", "register", "forgot-password", "reset-password", "privacy", "terms"]
+                    .map((page) => [page, `${here}${page}.html`])
+            )
+        }
     },
     server: {
         port: 5173,
