@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "../../public/css/style.css";
+import "./styles/style.css";
 import { AuthPage, type AuthPageName } from "./features/auth/AuthPages";
 
 // One entry for the four sign-in pages (login, register, forgot-password, reset-password).

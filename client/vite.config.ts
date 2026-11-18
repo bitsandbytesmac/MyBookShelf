@@ -3,29 +3,23 @@ import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
-const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 
-// The React app (being migrated from public/js). Production still serves public/ until the cutover.
+// The frontend (React + TypeScript). `npm run build:client` writes the finished site into public/,
+// which is what Vercel serves for an Express project (express.static is ignored there). public/ is
+// generated: never edit it by hand. In development, `npm run dev` serves client/ through this config
+// from inside Express (see server.js), with instant reload.
 export default defineConfig({
     root: here,
     plugins: [react()],
     build: {
-        outDir: "dist",
+        outDir: "../public",
         emptyOutDir: true,
-        // Same page URLs as public/: the app, the four sign-in pages and the two legal pages.
+        // Same page URLs as before: the app, the four sign-in pages and the two legal pages.
         rollupOptions: {
             input: Object.fromEntries(
                 ["index", "login", "register", "forgot-password", "reset-password", "privacy", "terms"]
                     .map((page) => [page, `${here}${page}.html`])
             )
         }
-    },
-    server: {
-        port: 5173,
-        // During the migration the stylesheet is imported straight from public/css (one copy only).
-        fs: { allow: [projectRoot] },
-        // The API is the Express server (npm run dev). Keep the browser's Host header: the server's
-        // same-origin check compares Origin with Host, so changeOrigin must stay off.
-        proxy: { "/api": { target: "http://localhost:3000", changeOrigin: false } }
     }
 });

@@ -40,9 +40,22 @@ app.use(express.json());
 // Logins live in a cookie now, so refuse change requests that come from other websites.
 app.use("/api", sameOriginOnly);
 
-// Serve frontend files. STATIC_DIR lets the tests serve the React build (client/dist) during the
-// migration; production never sets it (on Vercel, static files don't go through Express anyway).
-app.use(express.static(process.env.STATIC_DIR || 'public'));
+// Frontend. `npm run dev` (server.js --dev) runs the Vite dev server inside Express, so one server on one
+// port serves the API and the React app from client/ with instant reload. Otherwise Express serves the
+// built site in public/ (`npm run build:client`). On Vercel neither applies: static files in public/ are
+// served by Vercel itself, and Vite (a dev-only package) is never loaded in production.
+const devMode = process.argv.includes("--dev") && process.env.NODE_ENV !== "production";
+if (devMode) {
+    // A variable, not a literal: Vercel's bundler follows literal imports and would pack Vite (a dev-only
+    // package) into the production function for nothing.
+    const vitePackage = "vite";
+    const { createServer } = await import(vitePackage);
+    const vite = await createServer({ configFile: "client/vite.config.ts", server: { middlewareMode: true }, appType: "mpa" });
+    // Vite answers anything it doesn't know with a 404, so keep it away from the API.
+    app.use((req, res, next) => (req.path.startsWith("/api") ? next() : vite.middlewares(req, res, next)));
+} else {
+    app.use(express.static('public'));
+}
 
 // Serve the homepage when users visit the root URL
 app.get("/", (req, res) => {

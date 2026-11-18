@@ -10,5 +10,5 @@
         "checkJs": false,
         "types": ["node"]
     },
-    "include": ["./**/*.ts", "../playwright.config.ts", "../playwright.react.config.ts"]
+    "include": ["./**/*.ts", "../playwright.config.ts"]
 }

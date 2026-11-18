@@ -26,7 +26,9 @@ export default defineConfig({
         { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /mobile\.spec\.ts/ }
     ],
     webServer: {
-        command: "node server.js",
+        // Builds the React app into public/ first, so the tests always run the current code (and public/,
+        // which is what gets deployed, is fresh after a test run).
+        command: "npm run build:client && node server.js",
         url: `http://localhost:${PORT}/api/health`,
         // Tests run locally only and never spend cloud credits. An empty value wins over .env, because
         // dotenv never overwrites a variable that's already set:
@@ -40,6 +42,6 @@ export default defineConfig({
             SMTP_HOST: "", SMTP_USER: "", SMTP_PASS: ""
         },
         reuseExistingServer: false,
-        timeout: 30_000
+        timeout: 120_000
     }
 });

@@ -7,13 +7,11 @@
   },
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
-    "dev:client": "vite --config client/vite.config.ts",
+    "dev": "nodemon server.js --dev",
     "build:client": "vite build --config client/vite.config.ts",
     "typecheck:client": "tsc -p client",
     "migrate": "node scripts/migrate.js",
     "test:e2e": "playwright test",
-    "test:e2e:react": "playwright test --config playwright.react.config.ts",
     "test:e2e:report": "playwright show-report",
     "typecheck:e2e": "tsc -p e2e"
   },
@@ -25,9 +23,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.5.0",
     "nodemailer": "^7.0.13",
-    "pg": "^8.23.1",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
@@ -36,7 +32,18 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "nodemon": "^3.1.14",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "^5.7.2",
     "vite": "^8.3.8"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "client/*",
+      "public/*",
+      "e2e/*",
+      "test-results/*",
+      "playwright-report/*"
+    ]
   }
 }
