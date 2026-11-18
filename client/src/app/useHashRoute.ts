@@ -10,10 +10,19 @@ const subscribe = (onChange: () => void) => {
 };
 const getHash = () => location.hash;
 
+// The id part is URL-encoded (#/author/Ann%20Writer). A malformed one matches nothing, as in the vanilla app.
+function decode(part: string): string {
+    try {
+        return decodeURIComponent(part);
+    } catch {
+        return "";
+    }
+}
+
 export function parseHash(hash: string): HashRoute {
     const [path, query = ""] = hash.replace(/^#\/?/, "").split("?");
     const [name = "", id] = path.split("/");
-    return { name, id: id === undefined ? undefined : decodeURIComponent(id), params: new URLSearchParams(query) };
+    return { name, id: id === undefined ? undefined : decode(id), params: new URLSearchParams(query) };
 }
 
 export function useHashRoute(): HashRoute {

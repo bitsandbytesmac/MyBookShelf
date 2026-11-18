@@ -39,10 +39,10 @@ export function TopNav({ activeTab }: { activeTab: TabName }) {
                     ))}
                 </nav>
                 <div className="nav-actions">
-                    <button type="button" className="btn nav-add" data-action="add-book" aria-label="Add a book" title="Add a book" onClick={openAddBook}>
+                    <button type="button" className="btn nav-add" data-action="add-book" aria-label="Add a book" title="Add a book" onClick={() => openAddBook()}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
                     </button>
-                    <button type="button" className="btn btn-primary" data-action="log-reading" aria-label="Log your reading" onClick={openLogReading}>
+                    <button type="button" className="btn btn-primary" data-action="log-reading" aria-label="Log your reading" onClick={() => openLogReading()}>
                         {svg(<><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></>)}
                         <span className="label">Log your reading</span>
                     </button>
