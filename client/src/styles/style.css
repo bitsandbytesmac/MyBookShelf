@@ -278,8 +278,28 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .icon-btn svg { width: 18px; height: 18px; }
 .icon-btn.fav-on { color: var(--fav); }
 
+/* Long unbroken words wrap rather than overflow. Flex/grid children that hold text get min-width: 0 so
+   they can shrink to their box (otherwise a long word sets their minimum width). */
+body { overflow-wrap: break-word; }
+.cr-info, .reco-text, .open-spot-text, .match-info, .entry-text, .log-book > div, .search-result > div, .book-tile > div,
+.custom-goal-head > div, .recap-entry-body, .unlocked-text, .spot-row-text, .picker-text, .series-row-body,
+.author-card-body, .series-card-body, .challenge-card-title, .challenge-card-title h3, .log-pick-book, .next-book { min-width: 0; }
+.cover-fallback, .book-tile h3, .log-pick-book strong, .log-book strong, .dialog-head h2, .match-meta,
+.page-head h1, .slot-label, .custom-goal-head h3 { overflow-wrap: anywhere; }
+.book-grid > *, .log-pick > li, .dialog-head h2, .page-head > div, .series-hero-top > div, .author-hero > div,
+.series-card-title h3 { min-width: 0; }
+/* Headings hold names (books, series, authors, challenges): a word too long for its line breaks. */
+h1, h2, h3, h4 { overflow-wrap: anywhere; }
+/* Grid tiles and the Log your reading picker: their text is held to the tile's width, so a long title or
+   author is clamped or ends in "…" as designed, instead of widening the whole grid. */
+.book-tile > div, .log-pick-book > strong, .log-pick-book > small, .log-pick-progress { width: 100%; max-width: 100%; }
+
+/* Text buttons and links get a taller hit area (at least 24px, easier on touch screens) with no visual change. */
+.link-btn, .dash-card-head a, .label-row a { padding-block: 4px; margin-block: -4px; }
+.link-btn { min-width: 24px; }
+
 .link-btn {
-    padding: 0; border: none; background: none; cursor: pointer;
+    padding-inline: 0; border: none; background: none; cursor: pointer;
     font-size: 13px; font-weight: 700; color: var(--rose-deep);
 }
 .link-btn:hover { text-decoration: underline; }
@@ -325,7 +345,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .pill:hover { border-color: var(--rose); }
 .pill[aria-pressed="true"] { background: var(--blush); border-color: var(--rose); color: var(--text); }
 .pill[aria-pressed="true"]::before { content: "✓"; font-size: 11px; color: var(--rose-deep); }
-.pill-add { display: flex; gap: 6px; margin-top: 8px; }
+.goodreads-line { margin: 10px 0 0; font-size: 14px; font-weight: 700; }
+
+/* "Edit list": each choice gets a delete button (taking it off the reader's list). */
+.pill.is-selected { background: var(--blush); border-color: var(--rose); color: var(--text); }
+.pill-deletable { display: inline-flex; align-items: center; gap: 4px; padding-right: 4px; cursor: default; }
+.pill-delete {
+    display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%;
+    background: transparent; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer;
+}
+.pill-delete:hover, .pill-delete:focus-visible { background: var(--surface-2); color: var(--rose-deep); }
+.pill-add { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .pill-add .input { height: 32px; font-size: 13px; max-width: 220px; }
 
 /* ---------- App shell ---------- */
@@ -345,8 +375,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
     backdrop-filter: saturate(1.2) blur(10px);
 }
 .topnav-inner {
-    max-width: var(--maxw); height: 100%; margin: 0 auto; padding: 0 24px;
-    display: flex; align-items: center; gap: 28px;
+    /* A little wider than the page column, so the brand, seven tabs and actions fit on one line. */
+    max-width: calc(var(--maxw) + 120px); height: 100%; margin: 0 auto; padding: 0 24px;
+    display: flex; align-items: center; gap: 18px;
 }
 .brand {
     display: flex; align-items: center; gap: 10px;
@@ -368,10 +399,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .brand-mark svg { width: 17px; height: 17px; }
 
-.tabs { display: flex; gap: 4px; }
+.tabs { display: flex; gap: 2px; }
 .tab {
     display: flex; align-items: center; gap: 8px;
-    height: 38px; padding: 0 16px; border-radius: 999px;
+    height: 38px; padding: 0 12px; border-radius: 999px;
     color: var(--text-2); font-size: 14px; font-weight: 700;
     transition: background 0.18s var(--ease), color 0.18s var(--ease);
 }
@@ -523,7 +554,7 @@ a.menu-item { color: var(--text); }
 /* ---------- Dashboard ---------- */
 
 /* New dashboard: one grid of cards (Currently Reading, TBR, Completed, streak, goals, quote, Next Up, entries) */
-.head-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-shrink: 0; }
 .mobile-only { display: none; }
 .dash-board {
     display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-flow: dense; gap: 18px;
@@ -571,6 +602,13 @@ a.menu-item { color: var(--text); }
 .dash-done .cover-stack .cover { outline-color: var(--sage-soft); }
 
 .streak-body { display: flex; gap: 16px; align-items: stretch; }
+/* When the streak card itself is narrow (a three-column dashboard on a small laptop), the pill goes above
+   the calendar instead of squeezing it. */
+.dash-streak { container-type: inline-size; }
+@container (max-width: 175px) {
+    .streak-body { flex-direction: column; align-items: stretch; }
+    .streak-pill { width: auto; min-height: 0; flex-direction: row; justify-content: center; gap: 8px; padding: 10px 14px; }
+}
 .streak-pill {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; flex-shrink: 0;
     width: 76px; min-height: 150px; padding: 10px 6px; border-radius: 999px; text-align: center;
@@ -673,7 +711,7 @@ a.entry:hover { border-color: var(--rose); box-shadow: var(--shadow); transform:
 .log-book { display: flex; align-items: center; gap: 12px; }
 .log-book > div { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
 .log-book strong { font-family: var(--serif); font-size: 17px; line-height: 1.25; }
-.log-book small { font-size: 13px; color: var(--muted); }
+.log-book small { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .log-cols { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .log-cols .textarea { min-height: 190px; }
 .log-progress { gap: 12px; padding: 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); }
@@ -874,7 +912,7 @@ a.recap-title:hover { color: var(--rose-deep); }
 
 /* ---------- Book page ---------- */
 
-.back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; margin-bottom: 24px; color: var(--text-2); }
+.back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; padding: 4px 0; margin: -4px 0 20px; color: var(--text-2); }
 .back-link:hover { color: var(--rose-deep); text-decoration: none; }
 .back-link svg { width: 16px; height: 16px; }
 
@@ -901,9 +939,9 @@ a.recap-title:hover { color: var(--rose-deep); }
 .session-note { font-style: italic; color: var(--text); white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .sessions li strong { color: var(--sage-deep); }
 
-.detail-list { display: grid; grid-template-columns: auto 1fr; gap: 10px 18px; margin-top: 14px; font-size: 14px; }
+.detail-list { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 18px; margin-top: 14px; font-size: 14px; }
 .detail-list dt { color: var(--muted); font-weight: 600; }
-.detail-list dd { margin: 0; font-weight: 600; }
+.detail-list dd { margin: 0; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 
 .review-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .review-scores { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 14px; }
@@ -1188,7 +1226,7 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
 .series-row-arrow { width: 18px; height: 18px; color: var(--muted); }
 
 /* Book page + library tiles */
-.series-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 14px; font-weight: 700; }
+.series-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 14px; font-weight: 700; max-width: 100%; overflow-wrap: anywhere; }
 .series-link svg { width: 16px; height: 16px; }
 .tile-series { font-size: 12px; font-weight: 700; color: var(--rose-deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .field-row.series-fields { grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1.2fr); }
@@ -1309,7 +1347,7 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
     background: rgba(255, 255, 255, 0.9); color: #3a2f2f; font-size: 10px; font-weight: 700;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.slot-title { max-width: 130px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot-title { max-width: min(130px, 100%); font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .board-slot.is-done .slot-title { color: var(--sage-deep); font-weight: 700; }
 
 .slot-preview { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); }
@@ -1457,7 +1495,7 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
 }
 .slot-hint.is-ready { background: var(--sage); color: var(--on-sage); }
 .slot-hint.is-possible { border: 1px dashed var(--rose-deep); }
-.slot-rules { max-width: 130px; font-size: 11px; color: var(--muted); }
+.slot-rules { max-width: min(130px, 100%); font-size: 11px; color: var(--muted); }
 
 /* Book page: Challenge spots card */
 .spot-group { display: block; margin: 14px 0 6px; }
@@ -1609,7 +1647,7 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
 /* ---------- Legal pages ---------- */
 
 .legal { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
-.legal-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+.legal-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
 .legal-card { padding: 40px 44px; }
 .legal-card h1 { font-size: 34px; line-height: 1.15; font-weight: 520; letter-spacing: -0.02em; }
 .legal-meta { margin: 8px 0 24px; font-size: 13px; color: var(--muted); }
@@ -1640,17 +1678,13 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
     .cover-lg { width: 140px; font-size: 14px; }
 }
 
-@media (max-width: 640px) {
+/* ---------- Navigation by screen width ----------
+   Up to 900px (phones and tablets): the tabs move to a bar fixed at the bottom of the screen.
+   901-1239px (small laptops): one compact row (the brand shows its badge only, "Log your reading" its
+   pen icon), so all seven tabs fit. Wider: the full bar. */
+.tab { white-space: nowrap; }
+@media (max-width: 900px) {
     body { padding-bottom: 68px; }
-    .topnav-inner { padding: 0 16px; gap: 12px; }
-    .page { padding: 26px 16px 52px; }
-    .page-head { flex-direction: column; align-items: stretch; margin-bottom: 22px; }
-    .page-head h1 { font-size: 28px; }
-    .page-head h1::after { width: 18px; height: 18px; margin-left: 8px; }
-    body::before { width: 220px; height: 220px; right: -40px; bottom: 40px; }
-    body::after { display: none; }
-    .card-pad, .dash-card { padding: 18px; }
-
     .tabs {
         position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
         height: 68px; padding: 0 8px env(safe-area-inset-bottom);
@@ -1665,6 +1699,27 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
     .tab { position: relative; }
     .nav-actions .btn .label { display: none; }
     .nav-actions .btn { width: 38px; padding: 0; }
+    .tab { white-space: normal; }
+    .toasts { bottom: 84px; }
+}
+@media (min-width: 901px) and (max-width: 1239px) {
+    .topnav-inner { gap: 14px; padding: 0 20px; }
+    .topnav .brand-name { display: none; }
+    .tab { padding: 0 10px; }
+    .nav-actions .btn .label { display: none; }
+    .nav-actions .btn { width: 38px; padding: 0; }
+}
+
+@media (max-width: 640px) {
+    .topnav-inner { padding: 0 16px; gap: 12px; }
+    .page { padding: 26px 16px 52px; }
+    .page-head { flex-direction: column; align-items: stretch; margin-bottom: 22px; }
+    .page-head h1 { font-size: 28px; }
+    .page-head h1::after { width: 18px; height: 18px; margin-left: 8px; }
+    body::before { width: 220px; height: 220px; right: -40px; bottom: 40px; }
+    body::after { display: none; }
+    .card-pad, .dash-card { padding: 18px; }
+
 
     .mobile-only { display: inline-flex; }
     .head-actions { justify-content: space-between; }
@@ -1695,6 +1750,7 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
     .challenge-add .input { flex: none; }
     .match-row { flex-wrap: wrap; }
     .match-row > .btn { margin-left: 50px; }
+    .match-info { flex: 1 1 150px; }
     .open-spot { flex-wrap: wrap; }
     .open-spot-counts { justify-content: flex-start; }
     .spot-row { flex-wrap: wrap; }
@@ -1707,7 +1763,6 @@ dialog[open] { display: flex; flex-direction: column; animation: pop 0.16s ease;
     .search-result { grid-template-columns: 44px minmax(0, 1fr); }
     .search-result .cover { width: 44px; }
     .search-result .btn { grid-column: 1 / -1; }
-    .toasts { bottom: 84px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1722,4 +1777,16 @@ a.badge.meta:hover { border-color: var(--rose); color: var(--rose-deep); }
 @media (max-width: 640px) {
     .tabs { padding-left: 4px; padding-right: 4px; }
     .tab { font-size: 10.5px; padding: 0 1px; letter-spacing: -0.01em; line-height: 1.1; text-align: center; }
+}
+
+/* The smallest phones (320-360px): seven labels can't fit, so the tabs show their icons (the names stay
+   for screen readers), and the top bar shows the brand's badge only. Otherwise the page is laid out wider
+   than the screen and the browser zooms it out. */
+@media (max-width: 360px) {
+    .topnav .brand-name { display: none; }
+    .tab-label {
+        position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+        clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+    .tab svg { width: 24px; height: 24px; }
 }

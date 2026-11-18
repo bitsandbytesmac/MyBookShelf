@@ -8,14 +8,14 @@ import {
 
 type B = MatchBook;
 const book = (o: Partial<B> & { id: string; title: string }): B => ({
-    author: "Ann Writer", summary: "", status: "To Be Read", genres: [], subgenres: [], tropes: [], themes: [], settings: [], characters: [],
-    totalPages: 0, publishedYear: null, dateFinished: null, ageCategory: "", format: "", ...o
+    author: "Ann Writer", summary: "", status: "To Be Read", genres: [], subgenres: [], tropes: [], themes: [], characters: [], setting: "",
+    totalPages: 0, publishedYear: null, dateFinished: null, ageDemos: [], format: "", ...o
 });
 const TODAY = "2026-11-15";
 
 test.describe("matchSpot", () => {
     test("confirmed when the book's own tags meet every rule", () => {
-        const b = book({ id: "1", title: "Fourth Wing", genres: ["Fantasy"], subgenres: ["Romantasy"], tropes: ["Enemies to Lovers"], settings: ["Academy"] });
+        const b = book({ id: "1", title: "Fourth Wing", genres: ["Fantasy"], subgenres: ["Romantasy"], tropes: ["Enemies to Lovers"], setting: "A magic academy" });
         const m = matchSpot(b, { genres: ["Romantasy"], tropes: ["Enemies to Lovers", "Fake Dating"] });
         expect(m.status).toBe("confirmed");
         expect(m.reasons.map((r: { text: string }) => r.text)).toEqual(["Genre: Romantasy", "Trope: Enemies to Lovers"]);
@@ -60,7 +60,7 @@ test.describe("matchSpot", () => {
     });
 
     test("author, age and format", () => {
-        const b = book({ id: "1", title: "X", author: "Brandon Sanderson", ageCategory: "Adult", format: "Audiobook" });
+        const b = book({ id: "1", title: "X", author: "Brandon Sanderson", ageDemos: ["Young Adult", "Adult"], format: "Audiobook" });
         expect(matchSpot(b, { author: "sanderson", ageCategory: ["Adult", "New Adult"], format: ["Audiobook"] }).status).toBe("confirmed");
         expect(matchSpot(b, { format: ["Paperback"] }).status).toBe("none");
     });

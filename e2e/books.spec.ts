@@ -55,7 +55,7 @@ test.describe("Books", () => {
         await expect(page.locator(".bookcase").getByRole("link", { name: /^Early Bird/ })).toHaveCount(1);
     });
 
-    test("edit details saves age category, tropes, content warnings and series total", async ({ page, api }) => {
+    test("edit details saves Age Demo, tropes, content warnings and series total", async ({ page, api }) => {
         const book = await api.createBook({ title: "Thorns", series: "Court", seriesNumber: 1, totalPages: 400 });
         await page.goto(`/index.html#/book/${book.id}`);
         await page.getByRole("button", { name: "Edit details" }).click();
@@ -65,11 +65,11 @@ test.describe("Books", () => {
 
         // Genres, sub-genres, tropes and warnings all fold away, closed by default.
         const folds = edit.locator("details.foldout");
-        await expect(folds.locator("summary")).toHaveText([/^Genres/, /^Sub-genres/, /^Tropes/, /^Themes & keywords/, /^Setting/, /^Characters/, /^Trigger \/ content warnings/]);
+        await expect(folds.locator("summary")).toHaveText([/^Genres/, /^Sub-genres/, /^Tropes/, /^Trigger \/ content warnings/]);
         for (const fold of await folds.all()) await expect(fold).not.toHaveAttribute("open");
 
         await edit.getByLabel("Books in series", { exact: true }).fill("5");
-        await edit.getByLabel("Age category").selectOption("New Adult");
+        await edit.getByRole("group", { name: "Age Demo" }).getByRole("button", { name: "New Adult" }).click();
 
         await folds.locator("summary", { hasText: "Genres" }).first().click();
         await edit.getByRole("group", { name: "Genres" }).getByRole("button", { name: "Fantasy" }).click();

@@ -2,13 +2,13 @@ import type { Book, CustomGoal } from "../api/types";
 import { booksFinished } from "./readingRules";
 import { dayString } from "./dates";
 
-export const GOAL_FILTER_LABELS = { genre: "Genre", format: "Format", age: "Age category" } as const;
+export const GOAL_FILTER_LABELS = { genre: "Genre", format: "Format", age: "Age Demo" } as const;
 
 function matchesGoalFilter(book: Book, goal: CustomGoal): boolean {
     const v = (goal.filterValue || "").toLowerCase();
     if (goal.filterType === "genre") return [...book.genres, ...book.subgenres].some((g) => g.toLowerCase() === v);
     if (goal.filterType === "format") return (book.format || "").toLowerCase() === v;
-    if (goal.filterType === "age") return (book.ageCategory || "").toLowerCase() === v;
+    if (goal.filterType === "age") return book.ageDemos.some((a) => a.toLowerCase() === v);
     return true;
 }
 

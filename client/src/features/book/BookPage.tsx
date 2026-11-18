@@ -81,7 +81,8 @@ function Hero({ book }: { book: Book }) {
                     {book.format ? <span className="badge meta">{book.format}</span> : null}
                     {book.ownership ? <span className="badge meta">{book.ownership}</span> : null}
                     {book.isPhysical ? <a className="badge meta" href="#/physical">Physical book</a> : null}
-                    {book.ageCategory ? <span className="badge meta">{book.ageCategory}</span> : null}
+                    {book.isReread ? <span className="badge meta">Re-read</span> : null}
+                    {book.ageDemos.map((a) => <span key={`a-${a}`} className="badge meta">{a}</span>)}
                     {book.genres.map((g) => <span key={`g-${g}`} className="badge tag">{g}</span>)}
                     {book.subgenres.map((g) => <span key={`s-${g}`} className="badge tag-sub">{g}</span>)}
                 </div>
@@ -189,6 +190,7 @@ function ReviewCard({ book }: { book: Book }) {
                 {toggle("reviewed", "Review", "Written or posted")}
                 {toggle("journaled", "Reading journal", "Added to my journal")}
             </div>
+            {book.goodreadsUrl ? <p className="goodreads-line"><GoodreadsLink url={book.goodreadsUrl} /></p> : null}
             {!hasReview
                 ? <p className="sub" style={{ marginTop: "8px" }}>Rate it, add a spice level, save favourite quotes and write your thoughts.</p>
                 : <>
@@ -205,6 +207,11 @@ function ReviewCard({ book }: { book: Book }) {
     );
 }
 
+// The reader's review on Goodreads (always an https goodreads.com link: the server checks it).
+function GoodreadsLink({ url }: { url: string }) {
+    return <a href={url} target="_blank" rel="noopener noreferrer">My review on Goodreads ↗</a>;
+}
+
 // ---------- Details ----------
 
 function DetailsCard({ book }: { book: Book }) {
@@ -213,15 +220,15 @@ function DetailsCard({ book }: { book: Book }) {
         ["Series", book.series ? <a href={seriesHref(book.series)}>{seriesLabel(book)}</a> : ""],
         ["Format", book.format],
         ["Status", book.ownership],
-        ["Age category", book.ageCategory],
+        ["Age Demo", book.ageDemos.join(", ")],
         ["Pages", book.totalPages ? fmt.num(book.totalPages) : ""],
         ["Genres", book.genres.join(", ")],
         ["Sub-genres", book.subgenres.join(", ")],
         ["Tropes", book.tropes.join(", ")],
-        ["Themes & keywords", book.themes.join(", ")],
-        ["Setting", book.settings.join(", ")],
-        ["Characters", book.characters.join(", ")],
+        ["Setting", book.setting],
         ["Published", book.publishedYear ?? ""],
+        ["Re-read", book.isReread ? "Yes" : ""],
+        ["Goodreads review", book.goodreadsUrl ? <GoodreadsLink url={book.goodreadsUrl} /> : ""],
         ["Content warnings", book.contentWarnings.length
             ? <details className="cw-reveal"><summary>Show {fmt.plural(book.contentWarnings.length, "warning")}</summary><span>{book.contentWarnings.join(", ")}</span></details>
             : ""],

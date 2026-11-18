@@ -15,13 +15,14 @@ export type Book = {
     subgenres: string[];
     tropes: string[];
     contentWarnings: string[];
+    // Older tags, no longer edited (kept because existing challenge rules can still match them).
     themes: string[];
-    settings: string[];
     characters: string[];
+    setting: string;          // free text, e.g. "1920s Paris"
     publishedYear: number | null;
     format: string;
     ownership: string;
-    ageCategory: string;
+    ageDemos: string[];       // "Age Demo": Young Adult, New Adult, Adult (older books may have Children/Middle Grade)
     status: BookStatus;
     totalPages: number;
     currentPage: number;
@@ -36,6 +37,8 @@ export type Book = {
     reviewed: boolean;
     journaled: boolean;
     isPhysical: boolean;
+    isReread: boolean;
+    goodreadsUrl: string;     // link to the reader's review on Goodreads
     createdAt: string | null;
 };
 
@@ -138,6 +141,9 @@ export type Challenge = {
     items: ChallengeItem[];
     createdAt?: string;
 };
+
+// Categories the reader deleted from her lists of choices (books that have them keep them).
+export type HiddenTags = { genres: string[]; subgenres: string[]; tropes: string[]; contentWarnings: string[] };
 
 export type ThemePreset = "cream" | "blush" | "sage" | "lavender" | "night";
 export type Theme = { preset: ThemePreset; background: string | null };

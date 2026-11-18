@@ -4,7 +4,8 @@ import type { BookStatus } from "../api/types";
 export const STATUSES: BookStatus[] = ["To Be Read", "Reading", "Read", "Paused", "DNF"];
 export const FORMATS = ["Paperback", "Hardbound", "E-book", "Audiobook"];
 export const OWNERSHIP = ["Owned", "Borrowed", "Gifted"];
-export const AGE_CATEGORIES = ["Children", "Middle Grade", "Young Adult", "New Adult", "Adult"];
+// "Age Demo" choices offered (a book can have several). Older books may also have Children or Middle Grade.
+export const AGE_DEMOS = ["Young Adult", "New Adult", "Adult"];
 
 export const GENRES = [
     "Romance", "Fantasy", "Science Fiction", "Mystery", "Thriller", "Horror", "Historical Fiction",
@@ -35,26 +36,15 @@ export const CONTENT_WARNINGS = [
     "Animal death", "Cheating", "Racism", "Homophobia"
 ];
 
-// Suggestions for the tags the challenge matcher reads. Readers can add their own.
-export const THEMES = [
-    "Friendship", "Family", "Grief", "Love", "Revenge", "Redemption", "Identity", "Coming of age",
-    "Survival", "Power", "War", "Magic", "Mental health", "Found family", "Second chances", "Self-discovery",
-    "Betrayal", "Justice", "Hope", "Books about books"
-];
+// Suggestions for a challenge spot's Setting rule (a book's setting is free text; a rule word found in it counts).
 export const SETTINGS = [
     "Small town", "Big city", "Boarding school", "University", "Royal court", "Castle", "Space", "Island",
     "By the sea", "Forest", "Desert", "Mountains", "Winter", "Paris", "London", "New York", "Japan",
     "Victorian England", "Regency era", "World War II", "Future", "Fantasy world", "Bookshop"
 ];
-export const CHARACTERS = [
-    "Female lead", "Male lead", "Morally grey", "Villain lead", "Anti-hero", "Royalty", "Witch",
-    "Detective", "Assassin", "Dragon rider", "Artist", "Doctor", "Twins", "Siblings", "Queer lead",
-    "BIPOC lead", "Disabled lead", "Older protagonist", "Child narrator", "Multiple POV", "Unreliable narrator"
-];
-
+// The tag lists in Edit details. The reader can delete any choice from her own lists (HiddenTags).
 export const TAG_DEFAULTS = {
-    genres: GENRES, subgenres: SUBGENRES, tropes: TROPES, contentWarnings: CONTENT_WARNINGS,
-    themes: THEMES, settings: SETTINGS, characters: CHARACTERS
+    genres: GENRES, subgenres: SUBGENRES, tropes: TROPES, contentWarnings: CONTENT_WARNINGS
 };
 export type TagKind = keyof typeof TAG_DEFAULTS;
 

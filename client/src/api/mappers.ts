@@ -25,12 +25,12 @@ export function normalizeBook(row: BookRow): Book {
         tropes: list(row.tropes),
         contentWarnings: list(row.content_warnings),
         themes: list(row.themes),
-        settings: list(row.settings),
         characters: list(row.characters),
+        setting: (row.setting as string) || "",
         publishedYear: numOrNull(row.published_year),
         format: (row.format as string) || "",
         ownership: (row.ownership as string) || "",
-        ageCategory: (row.age_category as string) || "",
+        ageDemos: list(row.age_demos).length ? list(row.age_demos) : row.age_category ? [String(row.age_category)] : [],
         status: row.status,
         totalPages: Number(row.total_pages) || 0,
         currentPage: Number(row.current_page) || 0,
@@ -45,13 +45,16 @@ export function normalizeBook(row: BookRow): Book {
         reviewed: Boolean(row.reviewed),
         journaled: Boolean(row.journaled),
         isPhysical: Boolean(row.is_physical),
+        isReread: Boolean(row.is_reread),
+        goodreadsUrl: (row.goodreads_url as string) || "",
         createdAt: (row.created_at as string) || null
     };
 }
 
 // PUT /api/books/:id replaces the whole book, so this always sends every field.
 // Typed against Book, so a field added there and forgotten here is a compile error.
-export type BookPayload = { [K in keyof Omit<Book, "id" | "createdAt">]: unknown };
+// (Themes and characters are no longer edited, so they aren't sent; the server keeps what's stored.)
+export type BookPayload = { [K in keyof Omit<Book, "id" | "createdAt" | "themes" | "characters">]: unknown };
 
 export function toPayload(book: Partial<Book>): BookPayload {
     return {
@@ -66,13 +69,11 @@ export function toPayload(book: Partial<Book>): BookPayload {
         subgenres: book.subgenres || [],
         tropes: book.tropes || [],
         contentWarnings: book.contentWarnings || [],
-        themes: book.themes || [],
-        settings: book.settings || [],
-        characters: book.characters || [],
+        setting: book.setting || null,
         publishedYear: book.publishedYear ?? null,
         format: book.format || null,
         ownership: book.ownership || null,
-        ageCategory: book.ageCategory || null,
+        ageDemos: book.ageDemos || [],
         status: book.status,
         totalPages: book.totalPages || 0,
         currentPage: book.currentPage || 0,
@@ -86,6 +87,8 @@ export function toPayload(book: Partial<Book>): BookPayload {
         isFavorite: Boolean(book.isFavorite),
         reviewed: Boolean(book.reviewed),
         journaled: Boolean(book.journaled),
-        isPhysical: Boolean(book.isPhysical)
+        isPhysical: Boolean(book.isPhysical),
+        isReread: Boolean(book.isReread),
+        goodreadsUrl: book.goodreadsUrl || null
     };
 }

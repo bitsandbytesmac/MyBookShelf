@@ -1,4 +1,4 @@
-import type { Book } from "../api/types";
+import type { Book, HiddenTags } from "../api/types";
 import { TAG_DEFAULTS, type TagKind } from "./constants";
 import { today } from "./dates";
 
@@ -42,9 +42,11 @@ export function applyReadingRules<T extends RuleBook>(next: T, previous: RuleBoo
     return book;
 }
 
-// Every genre/sub-genre/trope/... in use, plus the defaults.
-export function tagOptions(books: Book[], kind: TagKind = "genres"): string[] {
-    return [...new Set([...TAG_DEFAULTS[kind], ...books.flatMap((b) => b[kind] || [])])];
+// The choices for a tag list: the defaults plus every value in use, minus the ones the reader deleted.
+// (A value already on the book being edited still shows: the multi-select always lists its own selection.)
+export function tagOptions(books: Book[], kind: TagKind = "genres", hidden?: HiddenTags | null): string[] {
+    const gone = new Set((hidden?.[kind] || []).map((v) => v.toLowerCase()));
+    return [...new Set([...TAG_DEFAULTS[kind], ...books.flatMap((b) => b[kind] || [])])].filter((v) => !gone.has(v.toLowerCase()));
 }
 
 export function booksFinished(books: Book[], { year, month }: { year?: number; month?: number } = {}): Book[] {

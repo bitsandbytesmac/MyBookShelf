@@ -22,11 +22,12 @@ export function TopNav({ activeTab }: { activeTab: TabName }) {
     return (
         <header className="topnav">
             <div className="topnav-inner">
-                <a href="#/dashboard" className="brand">
+                <a href="#/dashboard" className="brand" aria-label="MyBookShelf">
                     <span className="brand-mark">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z" /><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" /></svg>
                     </span>
-                    MyBookShelf
+                    {/* Hidden on small laptops (badge only), so the seven tabs fit. */}
+                    <span className="brand-name">MyBookShelf</span>
                 </a>
 
                 <nav className="tabs" aria-label="Main">
@@ -34,7 +35,7 @@ export function TopNav({ activeTab }: { activeTab: TabName }) {
                         <a key={tab.name} href={`#/${tab.name}`} className={`tab${tab.name === activeTab ? " active" : ""}`}
                             data-route={tab.name} aria-current={tab.name === activeTab ? "page" : undefined}>
                             {tab.icon}
-                            {tab.label}
+                            <span className="tab-label">{tab.label}</span>
                         </a>
                     ))}
                 </nav>

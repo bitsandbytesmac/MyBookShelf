@@ -134,6 +134,7 @@ test.describe("Sign-in pages", () => {
         await page.getByRole("link", { name: "Terms & Conditions" }).click();
         await expect(page).toHaveTitle(/Terms/);
         // Styled by the shared stylesheet (fonts are blocked in tests, so check a layout rule instead).
-        expect(await page.locator("main.legal").evaluate((el) => getComputedStyle(el).maxWidth)).not.toBe("none");
+        // (A retrying check: under load the page can be read a moment before its stylesheet has applied.)
+        await expect(page.locator("main.legal")).not.toHaveCSS("max-width", "none");
     });
 });

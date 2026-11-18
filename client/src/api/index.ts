@@ -3,7 +3,7 @@ import { request } from "./client";
 import { normalizeBook, toPayload, type BookRow } from "./mappers";
 import { today as localDate } from "../domain/dates";
 import type {
-    Activity, Book, Challenge, CustomGoal, Goals, GoogleVolume, RecapDay, RecapMonth, Session, Statistics, Theme, User
+    Activity, Book, Challenge, CustomGoal, Goals, GoogleVolume, HiddenTags, RecapDay, RecapMonth, Session, Statistics, Theme, User
 } from "./types";
 
 export { ApiError, logout } from "./client";
@@ -90,6 +90,13 @@ export const api = {
         return (await request<Challenge>(`/api/challenges/${id(challengeId)}`, { method: "PUT", body: { name, description, startsOn, endsOn, autoMatch, items } })).data;
     },
     deleteChallenge: (challengeId: string) => request(`/api/challenges/${id(challengeId)}`, { method: "DELETE" }),
+
+    async getHiddenTags(): Promise<HiddenTags> {
+        return (await request<HiddenTags>("/api/tags/hidden")).data;
+    },
+    async updateHiddenTags(hidden: HiddenTags): Promise<HiddenTags> {
+        return (await request<HiddenTags>("/api/tags/hidden", { method: "PUT", body: hidden })).data;
+    },
 
     async getTheme(): Promise<Theme> {
         return (await request<Theme>("/api/theme")).data;

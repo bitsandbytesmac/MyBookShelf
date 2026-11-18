@@ -10,6 +10,7 @@ import goalRoutes from "./src/routes/goalRoutes.js";
 import themeRoutes from "./src/routes/themeRoutes.js";
 import challengeRoutes from "./src/routes/challengeRoutes.js";
 import nextUpRoutes from "./src/routes/nextUpRoutes.js";
+import tagRoutes from "./src/routes/tagRoutes.js";
 import { sameOriginOnly } from "./src/utils/session.js";
 
 dotenv.config();
@@ -90,6 +91,7 @@ app.use("/api/goals", goalRoutes);
 app.use("/api/theme", themeRoutes);
 app.use("/api/challenges", challengeRoutes);
 app.use("/api/next-up", nextUpRoutes);
+app.use("/api/tags", tagRoutes);
 
 // Start server locally
 if (process.env.NODE_ENV !== "production") {

@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 
 const YEAR = new Date().getFullYear();
 
-type Tags = { genres?: string[]; subgenres?: string[]; tropes?: string[]; themes?: string[]; settings?: string[]; characters?: string[] };
+type Tags = { genres?: string[]; subgenres?: string[]; tropes?: string[]; setting?: string };
 
 // Books with tags, straight through the API.
 async function addBook(page: Page, title: string, extra: Record<string, unknown> & Tags = {}) {
@@ -122,20 +122,20 @@ test.describe("Smart challenges", () => {
 
     test("spot panel: ready, TBR and possible matches with reasons; a planned book completes when finished", async ({ page, account }) => {
         void account; // signs in
-        await addBook(page, "Finished Witch", { characters: ["Witch"], ...finished });
-        const tbr = await addBook(page, "Witch Next", { characters: ["Witch"], totalPages: 100 });
+        await addBook(page, "Finished Witch", { tropes: ["Witch"], ...finished });
+        const tbr = await addBook(page, "Witch Next", { tropes: ["Witch"], totalPages: 100 });
         await addBook(page, "Hinted", { summary: "Every witch in town is hiding something." });
-        const c = await addChallenge(page, { name: "Spooky", items: [{ label: "A witch", criteria: { characters: ["Witch"] } }, { label: "Red cover" }] });
+        const c = await addChallenge(page, { name: "Spooky", items: [{ label: "A witch", criteria: { tropes: ["Witch"] } }, { label: "Red cover" }] });
 
         await page.goto(`/index.html#/challenges/${c.id}`);
         await slotButton(page, "A witch").click();
         const panel = dialog(page, "A witch");
-        await expect(panel.locator(".rule-chip")).toHaveText(["Character: Witch"]);
+        await expect(panel.locator(".rule-chip")).toHaveText(["Trope: Witch"]);
         const sections = panel.locator(".match-section");
         await expect(sections.locator("h3")).toHaveText([/^Ready to count/, /^On your TBR or reading now/, /^Possible matches/]);
         await expect(sections.nth(0)).toContainText("Finished Witch");
         await expect(sections.nth(1)).toContainText("Witch Next");
-        await expect(sections.nth(2).locator(".reason-chip.is-possible")).toHaveText("Character “Witch” is mentioned in the summary");
+        await expect(sections.nth(2).locator(".reason-chip.is-possible")).toHaveText("Trope “Witch” is mentioned in the summary");
 
         // Plan the TBR book instead of counting the finished one.
         await sections.nth(1).getByRole("button", { name: "Plan this" }).click();

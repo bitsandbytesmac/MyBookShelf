@@ -2,7 +2,8 @@
 // State is replaced, never mutated, so React sees every change: each mutation builds a new
 // object for what changed and keeps the rest, and components re-render only for the slices they read.
 import { api } from "../api";
-import type { Activity, Book, Challenge, ChallengeItem, CustomGoal, Goals, NewBook, Session, Statistics } from "../api/types";
+import type { Activity, Book, Challenge, ChallengeItem, CustomGoal, Goals, HiddenTags, NewBook, Session, Statistics } from "../api/types";
+import type { TagKind } from "../domain/constants";
 import { applyReadingRules } from "../domain/readingRules";
 import { findSeries, nameKey } from "../domain/shelf";
 import { NEXT_UP_MAX } from "../domain/constants";
@@ -16,6 +17,7 @@ export type AppState = {
     customGoals: CustomGoal[];
     challenges: Challenge[];
     nextUp: string[];          // book ids picked for "Next Up" (max 3)
+    hiddenTags: HiddenTags;    // categories the reader deleted from her lists of choices
     loaded: boolean;
     loadError: string | null;
 };
@@ -29,6 +31,7 @@ let state: AppState = {
     customGoals: [],
     challenges: [],
     nextUp: [],
+    hiddenTags: { genres: [], subgenres: [], tropes: [], contentWarnings: [] },
     loaded: false,
     loadError: null
 };
@@ -56,12 +59,13 @@ export const getChallenge = (id: string | number) => state.challenges.find((c) =
 
 export async function loadAll() {
     try {
-        const [books, goals, customGoals, challenges, nextUp, activity] = await Promise.all([
+        const [books, goals, customGoals, challenges, nextUp, hiddenTags, activity] = await Promise.all([
             api.getBooks(),
             api.getGoals().catch(() => null),
             api.getCustomGoals().catch(() => []),
             api.getChallenges().catch(() => []),
             api.getNextUp().catch(() => []),
+            api.getHiddenTags().catch(() => null),
             fetchActivity()
         ]);
         // The nav's "Add book" works before this finishes; on a slow connection a book can be saved while
@@ -73,6 +77,7 @@ export async function loadAll() {
             customGoals,
             challenges,
             nextUp,
+            hiddenTags: hiddenTags || state.hiddenTags,
             ...(activity || {}),
             loaded: true,
             loadError: null
@@ -112,7 +117,7 @@ function withSeriesTotal(books: Book[], saved: Book): Book[] {
 
 export async function createBook(data: NewBook): Promise<Book> {
     const book: Partial<Book> = {
-        status: "To Be Read", genres: [], subgenres: [], tropes: [], contentWarnings: [], themes: [], settings: [], characters: [],
+        status: "To Be Read", genres: [], subgenres: [], tropes: [], contentWarnings: [], themes: [], characters: [], ageDemos: [],
         quotes: [], isFavorite: false, totalPages: 0, currentPage: 0, dateStarted: null, dateFinished: null, ...data
     };
     // A new book joins its series' existing total instead of clearing it.
@@ -222,6 +227,16 @@ export async function assignSpots(challengeId: string, assignments: Record<numbe
         return bookId ? { ...rest, bookId, assignedAt: now } : { ...rest, bookId: null, done: false };
     });
     return updateChallenge(challengeId, { items });
+}
+
+// ---------- Deleted categories ----------
+
+// Take a category off the reader's list of choices (deleted: true), or bring it back (deleted: false).
+export async function setTagDeleted(kind: TagKind, name: string, deleted: boolean) {
+    const key = name.trim().toLowerCase();
+    const others = state.hiddenTags[kind].filter((v) => v.toLowerCase() !== key);
+    const next = { ...state.hiddenTags, [kind]: deleted ? [...others, name.trim()] : others };
+    setState({ hiddenTags: await api.updateHiddenTags(next) });
 }
 
 // ---------- Next Up ----------

@@ -45,8 +45,12 @@ test("edit details fits a phone screen with the new sections", async ({ page, ap
     const edit = page.getByRole("dialog", { name: "Edit details" });
     for (const label of ["Series", "Book #", "Books in series"]) await expect(edit.getByLabel(label, { exact: true })).toBeVisible();
     await edit.locator("summary", { hasText: "Tropes" }).click();
-    await edit.locator("summary", { hasText: "Characters" }).click();
-    await edit.getByLabel("Published year").scrollIntoViewIfNeeded();
+    // A tag list in "Edit list" mode (each choice with its delete button) and the newer fields.
+    await edit.locator("summary", { hasText: "Genres" }).first().click();
+    await edit.getByRole("button", { name: "Edit list" }).first().click();
+    await expect(edit.getByRole("button", { name: "Delete “Romance” from your list" })).toBeVisible();
+    await edit.getByLabel("Goodreads review").scrollIntoViewIfNeeded();
+    await edit.getByRole("group", { name: "Age Demo" }).scrollIntoViewIfNeeded();
 
     const overflow = await edit.evaluate((d) => d.querySelector(".dialog-body")!.scrollWidth - d.querySelector(".dialog-body")!.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);

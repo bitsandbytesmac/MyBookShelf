@@ -23,12 +23,12 @@ export type MatchBook = {
     subgenres?: string[];
     tropes?: string[];
     themes?: string[];
-    settings?: string[];
     characters?: string[];
+    setting?: string;         // free text: a rule's word found in it counts as a confirmed fact
     totalPages?: number;
     publishedYear?: number | null;
     dateFinished?: string | null;
-    ageCategory?: string;
+    ageDemos?: string[];
     format?: string;
 };
 
@@ -38,7 +38,7 @@ export const LIST_RULES: { key: ListKey; label: string; tags: (b: MatchBook) => 
     { key: "genres", label: "Genre", tags: (b) => [...(b.genres || []), ...(b.subgenres || [])] },
     { key: "tropes", label: "Trope", tags: (b) => b.tropes || [] },
     { key: "themes", label: "Theme", tags: (b) => b.themes || [] },
-    { key: "settings", label: "Setting", tags: (b) => b.settings || [] },
+    { key: "settings", label: "Setting", tags: (b) => (b.setting ? [b.setting] : []) },
     { key: "characters", label: "Character", tags: (b) => b.characters || [] }
 ];
 
@@ -84,7 +84,8 @@ export function matchSpot(book: MatchBook, criteria: Criteria | null | undefined
         let hit: Reason | null = null;
         for (const w of wanted) {
             const tag = tags.find((t) => tagMeets(t, w));
-            if (tag) { hit = { text: `${rule.label}: ${tag}`, confirmed: true }; break; }
+            // The setting is the reader's own sentence, so name the word that matched rather than all of it.
+            if (tag) { hit = { text: `${rule.label}: ${rule.key === "settings" ? w : tag}`, confirmed: true }; break; }
         }
         // Themes/keywords also count when the title itself says so (a fact, so confirmed).
         if (!hit && rule.key === "themes") {
@@ -115,10 +116,11 @@ export function matchSpot(book: MatchBook, criteria: Criteria | null | undefined
         else missing.push(`Author: ${criteria.author}`);
     }
 
-    for (const [key, label, value] of [["ageCategory", "Age", book.ageCategory], ["format", "Format", book.format]] as const) {
+    for (const [key, label, values] of [["ageCategory", "Age Demo", book.ageDemos || []], ["format", "Format", book.format ? [book.format] : []]] as const) {
         const wanted = criteria[key];
         if (!wanted?.length) continue;
-        if (value && wanted.includes(value)) reasons.push({ text: `${label}: ${value}`, confirmed: true });
+        const value = values.find((v) => wanted.includes(v));
+        if (value) reasons.push({ text: `${label}: ${value}`, confirmed: true });
         else missing.push(`${label}: ${wanted.join(" or ")}`);
     }
 
@@ -150,7 +152,7 @@ export function describeCriteria(criteria: Criteria | null | undefined): string[
     for (const rule of LIST_RULES) if (criteria[rule.key]?.length) out.push(`${rule.label}: ${criteria[rule.key]!.join(" / ")}`);
     if (criteria.title?.value) out.push(criteria.title.mode === "startsWith" ? `Title starts with “${criteria.title.value}”` : `Title contains “${criteria.title.value}”`);
     if (criteria.author) out.push(`Author: ${criteria.author}`);
-    if (criteria.ageCategory?.length) out.push(`Age: ${criteria.ageCategory.join(" / ")}`);
+    if (criteria.ageCategory?.length) out.push(`Age Demo: ${criteria.ageCategory.join(" / ")}`);
     if (criteria.format?.length) out.push(`Format: ${criteria.format.join(" / ")}`);
     if (criteria.minPages || criteria.maxPages) out.push(pagesLabel(criteria));
     if (criteria.yearFrom !== undefined || criteria.yearTo !== undefined) {

@@ -39,12 +39,13 @@ export function Foldout({ label, children, count }: { label: string; children: R
 }
 
 // A tag list (genres, tropes, …) as a folded multi-select.
-export function TagFoldout({ label, groupLabel = label, placeholder, options, value, onChange }: {
+export function TagFoldout({ label, groupLabel = label, placeholder, options, value, onChange, onDelete, onAdd }: {
     label: string; groupLabel?: string; placeholder: string; options: string[]; value: string[]; onChange: (value: string[]) => void;
+    onDelete?: (option: string) => void; onAdd?: (option: string) => string | void;
 }) {
     return (
         <Foldout label={label} count={value.length}>
-            <MultiSelect options={options} value={value} onChange={onChange} label={groupLabel} placeholder={placeholder} />
+            <MultiSelect options={options} value={value} onChange={onChange} label={groupLabel} placeholder={placeholder} onDelete={onDelete} onAdd={onAdd} />
         </Foldout>
     );
 }

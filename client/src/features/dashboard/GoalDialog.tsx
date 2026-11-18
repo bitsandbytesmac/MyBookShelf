@@ -3,7 +3,7 @@ import { useRef, useState, type ReactNode } from "react";
 import type { CustomGoal } from "../../api/types";
 import { Modal, openDialog } from "../../components/Modal";
 import { toast } from "../../components/Toast";
-import { AGE_CATEGORIES, FORMATS } from "../../domain/constants";
+import { AGE_DEMOS, FORMATS } from "../../domain/constants";
 import { GOAL_FILTER_LABELS } from "../../domain/goals";
 import { tagOptions } from "../../domain/readingRules";
 import { getState, saveCustomGoal } from "../../store/store";
@@ -15,9 +15,12 @@ export function openGoalDialog(goal: CustomGoal | null = null) {
 type FilterType = keyof typeof GOAL_FILTER_LABELS;
 
 const CHOICES: Record<FilterType, () => string[]> = {
-    genre: () => [...new Set([...tagOptions(getState().books, "genres"), ...tagOptions(getState().books, "subgenres")])],
+    genre: () => {
+        const { books, hiddenTags } = getState();
+        return [...new Set([...tagOptions(books, "genres", hiddenTags), ...tagOptions(books, "subgenres", hiddenTags)])];
+    },
     format: () => FORMATS,
-    age: () => AGE_CATEGORIES
+    age: () => AGE_DEMOS
 };
 
 // The value list for a filter type, keeping the goal's own value first if it's not a suggestion.

@@ -6,7 +6,7 @@ Built with Express 5 and PostgreSQL, plus a React + TypeScript frontend built wi
 
 ## Features
 
-- **Library**: every book on a bookshelf or in a grid. Each book has its status (To Be Read, Reading, Paused, Read, DNF), format, genres and sub-genres, tropes, content warnings, age category, series, rating, review, favourite quotes and a cover. Covers can be uploaded or found through a Google Books search.
+- **Library**: every book on a bookshelf or in a grid. Each book has its status (To Be Read, Reading, Paused, Read, DNF), format, genres and sub-genres, tropes, content warnings, Age Demo, setting, series, rating, review, a Goodreads review link, a re-read mark, favourite quotes and a cover. You can delete the genres, sub-genres, tropes and content warnings you never use from your own lists. Covers can be uploaded or found through a Google Books search.
 - **Dashboard**:
   - currently reading, To Be Read and completed books, with covers
   - reading streak with a month calendar

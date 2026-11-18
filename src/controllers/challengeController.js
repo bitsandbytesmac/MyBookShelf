@@ -8,6 +8,7 @@ import pool from "../config/db.js";
 const LIMITS = { name: 120, description: 1000, items: 200, label: 200, tags: 20, tag: 60, author: 120 };
 const MAX_CHALLENGES = 50;
 const LIST_FIELDS = ["genres", "tropes", "themes", "settings", "characters"];
+// Spot rules on "Age Demo" (the field is still called ageCategory in the rules). Older rules may use all five.
 const AGE_CATEGORIES = ["Children", "Middle Grade", "Young Adult", "New Adult", "Adult"];
 const FORMATS = ["Paperback", "Hardbound", "E-book", "Audiobook"];
 const TITLE_MODES = ["startsWith", "contains"];
@@ -60,7 +61,7 @@ function parseCriteria(raw) {
         if (r.value.length) out[field] = r.value;
         return {};
     };
-    for (const [field, allowed, label] of [["ageCategory", AGE_CATEGORIES, "Age category"], ["format", FORMATS, "Format"]]) {
+    for (const [field, allowed, label] of [["ageCategory", AGE_CATEGORIES, "Age Demo"], ["format", FORMATS, "Format"]]) {
         const r = choice(field, allowed, label);
         if (r.error) return r;
     }

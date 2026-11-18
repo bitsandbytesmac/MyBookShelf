@@ -5,7 +5,9 @@ import { deleteUnusedCovers } from "../services/coverStorage.js";
 export const BOOK_STATUSES = ["To Be Read", "Reading", "Read", "DNF", "Paused"];
 export const BOOK_FORMATS = ["Paperback", "Hardbound", "E-book", "Audiobook"];
 export const BOOK_OWNERSHIP = ["Owned", "Borrowed", "Gifted"];
-export const AGE_CATEGORIES = ["Children", "Middle Grade", "Young Adult", "New Adult", "Adult"];
+// "Age Demo" (several per book). The app offers the last three; Children and Middle Grade are still
+// accepted because older books may have them.
+export const AGE_DEMOS = ["Children", "Middle Grade", "Young Adult", "New Adult", "Adult"];
 
 const LIMITS = { text: 300, summary: 10000, longText: 20000, tags: 20, labels: 40, tag: 60, quotes: 100, quote: 2000 };
 
@@ -32,6 +34,32 @@ function optionalChoice(value, choices, label) {
     if (value === undefined || value === null || value === "") return { value: null };
     if (!choices.includes(value)) return { error: `${label} must be one of: ${choices.join(", ")}.` };
     return { value };
+}
+
+function choiceList(value, choices, label) {
+    const r = stringList(value, choices.length, 60, label);
+    if (r.error) return r;
+    if (r.value.some((v) => !choices.includes(v))) return { error: `${label} must be from: ${choices.join(", ")}.` };
+    return r;
+}
+
+// A Goodreads page, e.g. https://www.goodreads.com/review/show/123. "goodreads.com/..." gets https:// added.
+// Only http(s) links on goodreads.com are kept, so the link on the book page is always safe to open.
+function goodreadsUrl(value) {
+    if (value === undefined || value === null || String(value).trim() === "") return { value: null };
+    if (typeof value !== "string" || value.trim().length > 500) return { error: "The Goodreads link is too long." };
+    const text = value.trim();
+    let url;
+    try {
+        url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+    } catch {
+        return { error: "The Goodreads link must be a web address, like https://www.goodreads.com/review/show/…" };
+    }
+    const host = url.hostname.toLowerCase();
+    if (!["http:", "https:"].includes(url.protocol) || !(host === "goodreads.com" || host.endsWith(".goodreads.com"))) {
+        return { error: "That isn't a Goodreads link. It should start with https://www.goodreads.com/" };
+    }
+    return { value: url.href };
 }
 
 function optionalScore(value, label) {
@@ -97,12 +125,11 @@ function parseBook(body = {}) {
         subgenres: stringList(body.subgenres, LIMITS.tags, LIMITS.tag, "Sub-genres"),
         format: optionalChoice(body.format, BOOK_FORMATS, "Format"),
         ownership: optionalChoice(body.ownership, BOOK_OWNERSHIP, "Ownership"),
-        age_category: optionalChoice(body.ageCategory, AGE_CATEGORIES, "Age category"),
+        age_demos: choiceList(body.ageDemos, AGE_DEMOS, "Age Demo"),
+        setting: optionalText(body.setting, 1000, "Setting"),
+        goodreads_url: goodreadsUrl(body.goodreadsUrl),
         tropes: stringList(body.tropes, LIMITS.labels, LIMITS.tag, "Tropes"),
         content_warnings: stringList(body.contentWarnings, LIMITS.labels, LIMITS.tag, "Content warnings"),
-        themes: stringList(body.themes, LIMITS.labels, LIMITS.tag, "Themes"),
-        settings: stringList(body.settings, LIMITS.labels, LIMITS.tag, "Settings"),
-        characters: stringList(body.characters, LIMITS.labels, LIMITS.tag, "Characters"),
         published_year: publishedYear(body.publishedYear),
         status: optionalChoice(body.status || "To Be Read", BOOK_STATUSES, "Book status"),
         total_pages: pageNumber(body.totalPages, "Total pages"),
@@ -136,7 +163,9 @@ function parseBook(body = {}) {
     values.is_favorite = Boolean(body.isFavorite);
     values.reviewed = Boolean(body.reviewed);
     values.journaled = Boolean(body.journaled);
-    values.is_physical = Boolean(body.isPhysical);              // shown on the Physical Bookshelf
+    values.is_physical = Boolean(body.isPhysical);              // shown in Physical Books
+    values.is_reread = Boolean(body.isReread);
+    values.age_category = values.age_demos[0] || null;          // legacy single-value column
     values.genre = values.genres[0] || "";                     // legacy single-genre column
     values.completed_at = values.date_finished;                 // legacy completion column
 
@@ -145,9 +174,9 @@ function parseBook(body = {}) {
 
 const COLUMNS = [
     "title", "author", "summary", "cover_url", "series", "series_number", "series_total", "genres", "subgenres",
-    "format", "ownership", "age_category", "tropes", "content_warnings", "themes", "settings", "characters", "published_year", "status",
+    "format", "ownership", "age_category", "age_demos", "tropes", "content_warnings", "setting", "goodreads_url", "published_year", "status",
     "total_pages", "current_page", "rating", "spice", "quotes", "review", "personal_notes",
-    "date_started", "date_finished", "is_favorite", "reviewed", "journaled", "is_physical", "genre", "completed_at"
+    "date_started", "date_finished", "is_favorite", "reviewed", "journaled", "is_physical", "is_reread", "genre", "completed_at"
 ];
 
 // The series total belongs to the whole series, so copy it to the user's other books in the same series.

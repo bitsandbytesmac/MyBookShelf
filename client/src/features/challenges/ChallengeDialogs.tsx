@@ -15,7 +15,7 @@ import {
     challengeProgress, hasCriteria, inWindow, matchSpot, proposeFills, searchQueryForSpot, suggestionsForSpot,
     unlocksForFinishedBook, type Match, type UnlockGroup
 } from "../../domain/challengeMatch";
-import { AGE_CATEGORIES, FORMATS } from "../../domain/constants";
+import { AGE_DEMOS, FORMATS, SETTINGS } from "../../domain/constants";
 import { today } from "../../domain/dates";
 import { tagOptions } from "../../domain/readingRules";
 import { assignSpots, createBook, createChallenge, getBook, getChallenge, getState, updateChallenge } from "../../store/store";
@@ -195,25 +195,24 @@ export function openSpotEditor(challengeId: string, index: number | null = null)
     openDialog((done) => <SpotEditor challengeId={challengeId} index={index} onClose={done} />);
 }
 
-type TagKey = "genres" | "tropes" | "themes" | "settings" | "characters";
+// The rules offered in the editor. (Older rules on themes or characters still count and still show as chips.)
+type TagKey = "genres" | "tropes" | "settings";
 const TAG_FOLDS: { key: TagKey; label: string }[] = [
-    { key: "genres", label: "Genres" }, { key: "tropes", label: "Tropes" }, { key: "themes", label: "Themes & keywords" },
-    { key: "settings", label: "Setting" }, { key: "characters", label: "Characters" }
+    { key: "genres", label: "Genres" }, { key: "tropes", label: "Tropes" }, { key: "settings", label: "Setting" }
 ];
 
 function SpotEditor({ challengeId, index, onClose }: { challengeId: string; index: number | null; onClose: () => void }) {
     const [item] = useState<Pick<ChallengeItem, "label" | "criteria">>(() => index === null ? { label: "", criteria: {} } : getChallenge(challengeId)!.items[index]);
     const c: Criteria = item.criteria || {};
     const [label, setLabel] = useState(item.label);
-    const [tags, setTags] = useState<Record<TagKey, string[]>>({
-        genres: c.genres || [], tropes: c.tropes || [], themes: c.themes || [], settings: c.settings || [], characters: c.characters || []
-    });
+    const [tags, setTags] = useState<Record<TagKey, string[]>>({ genres: c.genres || [], tropes: c.tropes || [], settings: c.settings || [] });
     const [options] = useState<Record<TagKey, string[]>>(() => {
-        const books = getState().books;
+        const { books, hiddenTags } = getState();
         return {
-            genres: [...new Set([...tagOptions(books, "genres"), ...tagOptions(books, "subgenres")])],
-            tropes: tagOptions(books, "tropes"), themes: tagOptions(books, "themes"),
-            settings: tagOptions(books, "settings"), characters: tagOptions(books, "characters")
+            genres: [...new Set([...tagOptions(books, "genres", hiddenTags), ...tagOptions(books, "subgenres", hiddenTags)])],
+            tropes: tagOptions(books, "tropes", hiddenTags),
+            // A book's setting is free text; these are words to look for in it.
+            settings: SETTINGS
         };
     });
     const [ages, setAges] = useState(c.ageCategory || []);
@@ -250,6 +249,9 @@ function SpotEditor({ challengeId, index, onClose }: { challengeId: string; inde
                 if (titleMode && !titleValue.trim()) return setError("Type the title text, or set Title to “Any title”."), false;
 
                 const criteria: Criteria = {
+                    // Rules the editor no longer offers are kept as they were.
+                    ...(c.themes?.length ? { themes: c.themes } : {}),
+                    ...(c.characters?.length ? { characters: c.characters } : {}),
                     ...tags, ageCategory: ages, format: formats,
                     ...(titleMode ? { title: { mode: titleMode as "startsWith" | "contains", value: titleValue.trim(), ignoreArticles: true } } : {}),
                     ...(author.trim() ? { author: author.trim() } : {}),
@@ -298,7 +300,7 @@ function SpotEditor({ challengeId, index, onClose }: { challengeId: string; inde
                     <div className="field"><span className="label">Pages</span><div className="range-pair">{num("minPages", "Min", "spMinPages")}<span>to</span>{num("maxPages", "Max", "spMaxPages")}</div></div>
                     <div className="field"><span className="label">Published</span><div className="range-pair">{num("yearFrom", "From", "spYearFrom")}<span>to</span>{num("yearTo", "To", "spYearTo")}</div></div>
                 </div>
-                <div className="field"><span className="label">Age category</span><PillToggles options={AGE_CATEGORIES} value={ages} onChange={setAges} label="Age category" /></div>
+                <div className="field"><span className="label">Age Demo</span><PillToggles options={[...new Set([...AGE_DEMOS, ...ages])]} value={ages} onChange={setAges} label="Age Demo" /></div>
                 <div className="field"><span className="label">Format</span><PillToggles options={FORMATS} value={formats} onChange={setFormats} label="Format" /></div>
             </div>
         </Modal>

@@ -8,6 +8,7 @@ import { Icon } from "../../components/Icon";
 import { Modal, openDialog } from "../../components/Modal";
 import { toast } from "../../components/Toast";
 import { createBook, getState } from "../../store/store";
+import { useStore } from "../../store/useStore";
 import { CoverPicker, type CoverChoice } from "./CoverPicker";
 import { TextField, sameBook } from "./formBits";
 import { fromGoogle, type GoogleBook } from "./googleBooks";
@@ -99,7 +100,8 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
 
 function SearchResult({ data, onAdded }: { data: GoogleBook; onAdded: () => void }) {
     const [adding, setAdding] = useState(false);
-    const owned = getState().books.some((b) => sameBook(b, data));
+    // Live: a search made before the shelf has finished loading still notices the books already on it.
+    const owned = useStore((state) => state.books.some((b) => sameBook(b, data)));
 
     async function add() {
         setAdding(true);
