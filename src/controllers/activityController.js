@@ -196,3 +196,58 @@ export async function getDayRecap(req, res) {
         res.status(500).json({ message: "Failed to retrieve that day's reading.", status: "error" });
     }
 }
+
+// ---------- Editing and deleting a journal note (book page, Reading progress) ----------
+
+const NOTE_MAX = 20000; // same limit as a note written in "Log your reading"
+const ENTRY_ID = /^\d{1,18}$/;
+
+// PUT /api/activities/:id/note  { note } - change the note of one of the reader's own journal entries.
+export async function updateEntryNote(req, res) {
+    if (!ENTRY_ID.test(req.params.id)) return res.status(400).json({ message: "That journal entry doesn't exist.", status: "error" });
+    const note = typeof req.body?.note === "string" ? req.body.note.trim() : "";
+    if (!note) return res.status(400).json({ message: "Write a note, or delete it instead.", status: "error" });
+    if (note.length > NOTE_MAX) return res.status(400).json({ message: `The note is too long (max ${NOTE_MAX} characters).`, status: "error" });
+
+    try {
+        const result = await pool.query(
+            "UPDATE reading_activities SET note = $1 WHERE id = $2 AND user_id = $3 RETURNING id, note",
+            [note, req.params.id, req.user.id]
+        );
+        if (!result.rows.length) return res.status(404).json({ message: "That journal entry doesn't exist.", status: "error" });
+        res.json({ message: "Note updated.", status: "success", data: { id: String(result.rows[0].id), note: result.rows[0].note } });
+    } catch (error) {
+        console.error("Error updating a journal note:", error);
+        res.status(500).json({ message: "Failed to update the note.", status: "error" });
+    }
+}
+
+// DELETE /api/activities/:id/note - remove the note. An entry that also logged pages keeps them (they're
+// reading history: the streak, the recap and the page totals count them); a note-only entry is removed.
+export async function deleteEntryNote(req, res) {
+    if (!ENTRY_ID.test(req.params.id)) return res.status(400).json({ message: "That journal entry doesn't exist.", status: "error" });
+    let client;
+    try {
+        client = await pool.connect();
+        await client.query("BEGIN");
+        const entry = await client.query(
+            "SELECT pages_read FROM reading_activities WHERE id = $1 AND user_id = $2 FOR UPDATE",
+            [req.params.id, req.user.id]
+        );
+        if (!entry.rows.length) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "That journal entry doesn't exist.", status: "error" });
+        }
+        const keepsPages = Number(entry.rows[0].pages_read) > 0;
+        if (keepsPages) await client.query("UPDATE reading_activities SET note = NULL WHERE id = $1 AND user_id = $2", [req.params.id, req.user.id]);
+        else await client.query("DELETE FROM reading_activities WHERE id = $1 AND user_id = $2", [req.params.id, req.user.id]);
+        await client.query("COMMIT");
+        res.json({ message: "Note deleted.", status: "success", data: { id: String(req.params.id), entryDeleted: !keepsPages } });
+    } catch (error) {
+        await client?.query("ROLLBACK").catch(() => {});
+        console.error("Error deleting a journal note:", error);
+        res.status(500).json({ message: "Failed to delete the note.", status: "error" });
+    } finally {
+        client?.release();
+    }
+}

@@ -18,6 +18,7 @@ import { openLogReading, openSpot } from "../../app/actions";
 import { openEditBook } from "../books/EditBookDialog";
 import { openReview } from "../books/ReviewDialog";
 import { ReasonChips, challengeHref } from "../challenges/chips";
+import { JournalNote } from "../journal/JournalNote";
 
 // Runs a change and reports how it went in a toast.
 async function run(action: () => Promise<unknown>, message?: string) {
@@ -154,7 +155,7 @@ function ProgressCard({ book }: { book: Book }) {
                                     <span>{fmt.date(a.session_date || a.created_at)}{a.pages_read > 0 ? ` · p. ${a.previous_page} → ${a.current_page}` : ""}</span>
                                     <strong>{a.pages_read > 0 ? `+${a.pages_read}` : "Note"}</strong>
                                 </span>
-                                {a.note ? <span className="session-note">{a.note}</span> : null}
+                                {a.note ? <JournalNote entry={a} /> : null}
                             </li>
                         ))}
                     </ul>

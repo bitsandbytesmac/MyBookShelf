@@ -106,6 +106,21 @@ export async function refreshActivity() {
     if (activity) setState(activity);
 }
 
+// ---------- Journal notes ----------
+
+// Both refresh the journal, so the book page, the dashboard's recent entries, the streak and the
+// Reading Recap (its cache follows activityVersion) all show the change.
+export async function editEntryNote(entryId: string, note: string) {
+    await api.updateEntryNote(entryId, note);
+    await refreshActivity();
+}
+
+export async function deleteEntryNote(entryId: string) {
+    const result = await api.deleteEntryNote(entryId);
+    await refreshActivity();
+    return result;
+}
+
 // ---------- Books ----------
 
 // The server copies a book's series total to the rest of its series; mirror that locally.

@@ -53,6 +53,12 @@ export const api = {
     async getRecapDay(date: string): Promise<RecapDay> {
         return (await request<RecapDay>(`/api/activities/recap/${encodeURIComponent(date)}`)).data;
     },
+    // A journal entry's note: change it, or delete it (a note-only entry is removed; one with pages keeps them).
+    updateEntryNote: (entryId: string, note: string) =>
+        request(`/api/activities/${id(entryId)}/note`, { method: "PUT", body: { note } }),
+    async deleteEntryNote(entryId: string): Promise<{ entryDeleted: boolean }> {
+        return (await request<{ entryDeleted: boolean }>(`/api/activities/${id(entryId)}/note`, { method: "DELETE" })).data;
+    },
 
     async getGoals(): Promise<Goals> {
         return (await request<Goals>("/api/goals")).data;
