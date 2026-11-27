@@ -13,6 +13,9 @@ const PORT = 3210;
 export default defineConfig({
     testDir: "./e2e",
     fullyParallel: true,
+    // Some tests walk through many steps (a fortnight of simulated days, a whole chapter flow); under
+    // --repeat-each with 8 workers they need more than the default 30 s. No retries: a flaky test is fixed.
+    timeout: 60_000,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 1 : 0,
     reporter: [["list"], ["html", { open: "never" }]],

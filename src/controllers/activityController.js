@@ -14,6 +14,7 @@ export async function getReadingActivities(req, res) {
                 pages_read,
                 session_date,
                 note,
+                chapter,
                 created_at
              FROM reading_activities
              WHERE user_id = $1
@@ -161,7 +162,7 @@ export async function getDayRecap(req, res) {
     try {
         const result = await pool.query(
             `SELECT a.id, a.book_id, a.book_title, a.previous_page, a.current_page, a.pages_read,
-                    a.session_date, a.note, a.created_at,
+                    a.session_date, a.note, a.chapter, a.created_at,
                     b.title AS title, b.author, b.cover_url, b.total_pages
              FROM reading_activities a
              LEFT JOIN books b ON b.id = a.book_id AND b.user_id = a.user_id
@@ -182,6 +183,7 @@ export async function getDayRecap(req, res) {
             currentPage: r.current_page,
             pagesRead: r.pages_read || 0,
             sessionDate: r.session_date,
+            chapter: r.chapter ?? null,
             note: r.note || "",
             createdAt: r.created_at
         }));
@@ -249,5 +251,24 @@ export async function deleteEntryNote(req, res) {
         res.status(500).json({ message: "Failed to delete the note.", status: "error" });
     } finally {
         client?.release();
+    }
+}
+
+// GET /api/activities/book/:bookId/chapters - every chapter note of one of the reader's books (all of them,
+// not just the latest entries), by chapter, newest first within a chapter.
+export async function getChapterNotes(req, res) {
+    if (!ENTRY_ID.test(req.params.bookId)) return res.status(400).json({ message: "That book doesn't exist.", status: "error" });
+    try {
+        const result = await pool.query(
+            `SELECT id, book_id, book_title, previous_page, current_page, pages_read, session_date, note, chapter, created_at
+             FROM reading_activities
+             WHERE user_id = $1 AND book_id = $2 AND chapter IS NOT NULL AND note IS NOT NULL
+             ORDER BY chapter ASC, session_date DESC, created_at DESC`,
+            [req.user.id, req.params.bookId]
+        );
+        res.json({ status: "success", data: result.rows });
+    } catch (error) {
+        console.error("Error retrieving chapter notes:", error);
+        res.status(500).json({ message: "Failed to load the chapter notes.", status: "error" });
     }
 }

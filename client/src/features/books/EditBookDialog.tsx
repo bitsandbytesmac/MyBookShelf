@@ -50,6 +50,7 @@ function EditBookDialog({ book, onClose }: { book: Book; onClose: () => void }) 
         status: book.status as string, format: book.format, ownership: book.ownership,
         isPhysical: book.isPhysical, isReread: book.isReread, goodreadsUrl: book.goodreadsUrl,
         total: book.totalPages ? String(book.totalPages) : "", current: book.currentPage ? String(book.currentPage) : "",
+        chapters: book.chapterCount != null ? String(book.chapterCount) : "",
         year: book.publishedYear != null ? String(book.publishedYear) : ""
     });
     const set = <K extends keyof typeof f>(key: K) => (value: (typeof f)[K]) => setF((prev) => ({ ...prev, [key]: value }));
@@ -104,6 +105,10 @@ function EditBookDialog({ book, onClose }: { book: Book; onClose: () => void }) 
                 if (publishedYear !== null && (!Number.isInteger(publishedYear) || publishedYear < 0 || publishedYear > 2200)) {
                     return setError("Published year must be a year like 1999."), false;
                 }
+                const chapterCount = f.chapters.trim() === "" ? null : Number(f.chapters);
+                if (chapterCount !== null && (!Number.isInteger(chapterCount) || chapterCount < 1 || chapterCount > 999)) {
+                    return setError("Chapters must be a whole number from 1 to 999."), false;
+                }
                 const goodreads = checkGoodreadsUrl(f.goodreadsUrl);
                 if ("error" in goodreads) return setError(goodreads.error), false;
 
@@ -119,7 +124,7 @@ function EditBookDialog({ book, onClose }: { book: Book; onClose: () => void }) 
                     isReread: f.isReread,
                     goodreadsUrl: goodreads.value,
                     ageDemos,
-                    totalPages, currentPage,
+                    totalPages, currentPage, chapterCount,
                     ...tags,
                     publishedYear,
                     coverUrl: await cover.current!.resolve()
@@ -149,7 +154,7 @@ function EditBookDialog({ book, onClose }: { book: Book; onClose: () => void }) 
                     <CheckCard id="ePhysical" label="Physical book" hint="Shows it in Physical Books" checked={f.isPhysical} onChange={set("isPhysical")} />
                     <CheckCard id="eReread" label="Re-read" hint="I've read this one before" checked={f.isReread} onChange={set("isReread")} />
                 </div>
-                <div className="field-row">
+                <div className="field-row-3">
                     <div className="field">
                         <label htmlFor="eTotal">Total pages</label>
                         <input className="input" id="eTotal" type="number" min={0} inputMode="numeric" value={f.total} onChange={(e) => set("total")(e.target.value)} />
@@ -157,6 +162,11 @@ function EditBookDialog({ book, onClose }: { book: Book; onClose: () => void }) 
                     <div className="field">
                         <label htmlFor="eCurrent">Page I'm on</label>
                         <input className="input" id="eCurrent" type="number" min={0} inputMode="numeric" value={f.current} onChange={(e) => set("current")(e.target.value)} />
+                    </div>
+                    <div className="field">
+                        <label htmlFor="eChapters">Chapters</label>
+                        <input className="input" id="eChapters" type="number" min={1} max={999} inputMode="numeric" placeholder="e.g. 24"
+                            value={f.chapters} onChange={(e) => set("chapters")(e.target.value)} />
                     </div>
                 </div>
                 <div className="field">

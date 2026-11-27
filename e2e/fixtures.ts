@@ -57,8 +57,14 @@ export async function signUpViaApi(request: APIRequestContext, page: Page): Prom
     const stamp = `${Date.now()}${Math.floor(Math.random() * 1e6)}`;
     // Usernames are unique too, not just emails.
     const account = { username: `E2E Reader ${stamp}`, email: `e2e${stamp}@example.test`, password: "E2e-test-pass-123" };
-    await ok(await request.post("/api/auth/register", { data: account }));
-    const user = await ok(await request.post("/api/auth/login", { data: { email: account.email, password: account.password } }));
+    // Under heavy parallel load a reused keep-alive socket can be reset just as the server closes it
+    // (ECONNRESET). That's a transport hiccup, so each call is tried once more. If the first sign-up did
+    // reach the server, the retry answers 409 (email taken): the account exists, which is what we wanted.
+    const register = () => request.post("/api/auth/register", { data: account });
+    const registered = await register().catch(register);
+    if (registered.status() !== 409) await ok(registered);
+    const login = () => request.post("/api/auth/login", { data: { email: account.email, password: account.password } });
+    const user = await ok(await login().catch(login));
     // The app only opens when it finds the display copy of the user in localStorage (the session itself is the cookie).
     await page.addInitScript((u) => localStorage.setItem("user", JSON.stringify(u)), { id: user.id, username: user.username, email: user.email });
     return account;

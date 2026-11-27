@@ -35,7 +35,7 @@ export const api = {
         const body = {
             ...toPayload(book),
             localDate: localDate(),
-            ...(session ? { sessionDate: session.date || null, sessionNote: session.note || null } : {})
+            ...(session ? { sessionDate: session.date || null, sessionNote: session.note || null, sessionChapter: session.chapter || null } : {})
         };
         return normalizeBook((await request<BookRow>(`/api/books/${id(bookId)}`, { method: "PUT", body })).data);
     },
@@ -52,6 +52,10 @@ export const api = {
     },
     async getRecapDay(date: string): Promise<RecapDay> {
         return (await request<RecapDay>(`/api/activities/recap/${encodeURIComponent(date)}`)).data;
+    },
+    // Every chapter note of one book (all of them, not just the latest entries), by chapter.
+    async getChapterNotes(bookId: string): Promise<Activity[]> {
+        return (await request<Activity[]>(`/api/activities/book/${id(bookId)}/chapters`)).data;
     },
     // A journal entry's note: change it, or delete it (a note-only entry is removed; one with pages keeps them).
     updateEntryNote: (entryId: string, note: string) =>

@@ -26,6 +26,7 @@ export type Book = {
     status: BookStatus;
     totalPages: number;
     currentPage: number;
+    chapterCount: number | null;  // chapters are numbered 1..chapterCount; notes can be filed under one
     rating: number | null;
     spice: number | null;
     quotes: string[];
@@ -46,7 +47,7 @@ export type Book = {
 export type NewBook = Partial<Omit<Book, "id">> & { title: string; author: string };
 
 // A "Log your reading" entry saved with a book update.
-export type Session = { date?: string | null; note?: string | null };
+export type Session = { date?: string | null; note?: string | null; chapter?: number | null };
 
 // GET /api/activities (latest 30, snake_case straight from the table).
 export type Activity = {
@@ -58,6 +59,7 @@ export type Activity = {
     pages_read: number;
     session_date: string;
     note: string | null;
+    chapter?: number | null;
     created_at: string;
 };
 
@@ -88,6 +90,7 @@ export type RecapEntry = {
     pagesRead: number;
     sessionDate: string;
     note: string;
+    chapter: number | null;
     createdAt: string;
 };
 

@@ -276,6 +276,7 @@ function EntryRow({ entry: e, exists }: { entry: RecapEntry; exists: boolean }) 
     } else {
         progress = e.note ? "Journal note" : "Progress update";
     }
+    if (e.chapter) progress = `Chapter ${e.chapter} · ${progress}`;
 
     // An entry saved on the same day shows its time; one logged later for this day says when it was written.
     const savedOn = localDay(e.createdAt);

@@ -19,6 +19,7 @@ import { openEditBook } from "../books/EditBookDialog";
 import { openReview } from "../books/ReviewDialog";
 import { ReasonChips, challengeHref } from "../challenges/chips";
 import { JournalNote } from "../journal/JournalNote";
+import { ChaptersCard } from "./ChaptersCard";
 
 // Runs a change and reports how it went in a toast.
 async function run(action: () => Promise<unknown>, message?: string) {
@@ -51,6 +52,7 @@ export function BookPage({ id }: { id: string | undefined }) {
                 <div><ProgressCard book={book} /><ReviewCard book={book} /><ChallengeSpotsCard book={book} /></div>
                 <div><DetailsCard book={book} /><NotesCard key={book.id} book={book} /></div>
             </div>
+            <ChaptersCard book={book} />
         </div>
     );
 }
@@ -123,8 +125,12 @@ function Hero({ book }: { book: Book }) {
 function ProgressCard({ book }: { book: Book }) {
     const pct = percent(book);
     const activities = useStore((s) => s.activities);
-    // This book's latest journal entries: date, pages read and the note.
-    const sessions = useMemo(() => activities.filter((a) => String(a.book_id) === book.id).slice(0, 6), [activities, book.id]);
+    // This book's latest journal entries: date, pages read and the note. Chapter notes live in the
+    // Chapters card instead: a chapter note on its own is left out here, and an entry that also logged
+    // pages shows just its pages.
+    const sessions = useMemo(() => activities
+        .filter((a) => String(a.book_id) === book.id && !(a.chapter && a.pages_read <= 0))
+        .slice(0, 6), [activities, book.id]);
 
     return (
         <section className="card card-pad">
@@ -155,7 +161,7 @@ function ProgressCard({ book }: { book: Book }) {
                                     <span>{fmt.date(a.session_date || a.created_at)}{a.pages_read > 0 ? ` · p. ${a.previous_page} → ${a.current_page}` : ""}</span>
                                     <strong>{a.pages_read > 0 ? `+${a.pages_read}` : "Note"}</strong>
                                 </span>
-                                {a.note ? <JournalNote entry={a} /> : null}
+                                {a.note && !a.chapter ? <JournalNote entry={a} /> : null}
                             </li>
                         ))}
                     </ul>

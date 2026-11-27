@@ -62,6 +62,14 @@ function goodreadsUrl(value) {
     return { value: url.href };
 }
 
+// How many chapters the book has (1-999), or none. Chapters are numbered 1..chapterCount.
+function chapterNumber(value, label) {
+    if (value === undefined || value === null || value === "") return { value: null };
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 1 || n > 999) return { error: `${label} must be a whole number from 1 to 999.` };
+    return { value: n };
+}
+
 function optionalScore(value, label) {
     if (value === undefined || value === null || value === "" || value === 0) return { value: null };
     const n = Number(value);
@@ -131,6 +139,7 @@ function parseBook(body = {}) {
         tropes: stringList(body.tropes, LIMITS.labels, LIMITS.tag, "Tropes"),
         content_warnings: stringList(body.contentWarnings, LIMITS.labels, LIMITS.tag, "Content warnings"),
         published_year: publishedYear(body.publishedYear),
+        chapter_count: chapterNumber(body.chapterCount, "Chapters"),
         status: optionalChoice(body.status || "To Be Read", BOOK_STATUSES, "Book status"),
         total_pages: pageNumber(body.totalPages, "Total pages"),
         current_page: pageNumber(body.currentPage, "Current page"),
@@ -176,7 +185,7 @@ const COLUMNS = [
     "title", "author", "summary", "cover_url", "series", "series_number", "series_total", "genres", "subgenres",
     "format", "ownership", "age_category", "age_demos", "tropes", "content_warnings", "setting", "goodreads_url", "published_year", "status",
     "total_pages", "current_page", "rating", "spice", "quotes", "review", "personal_notes",
-    "date_started", "date_finished", "is_favorite", "reviewed", "journaled", "is_physical", "is_reread", "genre", "completed_at"
+    "chapter_count", "date_started", "date_finished", "is_favorite", "reviewed", "journaled", "is_physical", "is_reread", "genre", "completed_at"
 ];
 
 // The series total belongs to the whole series, so copy it to the user's other books in the same series.
@@ -252,8 +261,10 @@ function parseSession(body = {}) {
     if (date.value && date.value > latest) return { error: "The reading date can't be in the future." };
     const note = optionalText(body.sessionNote, LIMITS.longText, "Note");
     if (note.error) return { error: note.error };
+    const chapter = chapterNumber(body.sessionChapter, "Chapter");
+    if (chapter.error) return { error: chapter.error };
     // The reader's own date, used when no session date was picked (see utils/dates.js).
-    return { date: date.value, note: note.value, today: readerToday(body.localDate) };
+    return { date: date.value, note: note.value, chapter: chapter.value, today: readerToday(body.localDate) };
 }
 
 // PUT - replace a book's details (the client always sends the full book)
@@ -281,6 +292,21 @@ export async function updateBook(req, res) {
 
         const previousPage = Number(existing.rows[0].current_page) || 0;
         const previousStatus = existing.rows[0].status;
+
+        // Chapters: a chapter with notes can't disappear, and a note can only go under a chapter the book has.
+        const noted = await client.query(
+            "SELECT MAX(chapter) AS max FROM reading_activities WHERE book_id = $1 AND user_id = $2 AND note IS NOT NULL",
+            [req.params.id, req.user.id]
+        );
+        const highest = Number(noted.rows[0].max) || 0;
+        if (highest && (values.chapter_count === null || values.chapter_count < highest)) {
+            await client.query("ROLLBACK");
+            return sendError(res, 400, `Chapter ${highest} has notes, so the book needs at least ${highest} chapters.`);
+        }
+        if (session.chapter && (values.chapter_count === null || session.chapter > values.chapter_count)) {
+            await client.query("ROLLBACK");
+            return sendError(res, 400, values.chapter_count ? `This book has ${values.chapter_count} chapters.` : "Add the number of chapters in Edit details first.");
+        }
         const assignments = COLUMNS.map((c, i) => `${c} = $${i + 1}`).join(", ");
         const params = [...COLUMNS.map((c) => values[c]), req.params.id, req.user.id];
 
@@ -298,10 +324,12 @@ export async function updateBook(req, res) {
         const finishedBefore = previousStatus === "To Be Read" && values.status === "Read" && !session.date && !session.note;
         if ((values.current_page > previousPage && !finishedBefore) || session.note) {
             await client.query(
-                `INSERT INTO reading_activities (user_id, book_id, book_title, previous_page, current_page, pages_read, session_date, note)
-                 VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, $9::date, CURRENT_DATE), $8)`,
+                `INSERT INTO reading_activities (user_id, book_id, book_title, previous_page, current_page, pages_read, session_date, note, chapter)
+                 VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, $9::date, CURRENT_DATE), $8, $10)`,
                 [req.user.id, req.params.id, values.title, previousPage, values.current_page,
-                    Math.max(0, values.current_page - previousPage), session.date, session.note, session.today]
+                    Math.max(0, values.current_page - previousPage), session.date, session.note, session.today,
+                    // A chapter only goes with a note (it says what the note is about).
+                    session.note ? session.chapter : null]
             );
         }
 

@@ -444,7 +444,7 @@ function RecentEntriesCard() {
                                 <Cover book={shown} size="sm" />
                                 <span className="entry-text">
                                     <strong className="entry-date">{dayLabel(a.session_date || a.created_at)}</strong>
-                                    <span className="entry-pages">{a.pages_read > 0 ? `+${fmt.plural(a.pages_read, "page")} read` : "Journal note"}</span>
+                                    <span className="entry-pages">{a.pages_read > 0 ? `+${fmt.plural(a.pages_read, "page")} read` : a.chapter ? `Chapter ${a.chapter} note` : "Journal note"}</span>
                                     <span className="entry-book">{shown.title}</span>
                                     {a.note ? <span className="entry-note">{a.note}</span> : null}
                                 </span>

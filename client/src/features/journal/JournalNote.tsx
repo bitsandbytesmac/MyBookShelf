@@ -12,7 +12,11 @@ const NOTE_MAX = 20000;
 // "Nov 18, 2026 · +15 pages" (or just the date for a note-only entry).
 const entryLabel = (a: Activity) => [fmt.date(a.session_date || a.created_at), a.pages_read > 0 ? `+${fmt.plural(a.pages_read, "page")}` : null].filter(Boolean).join(" · ");
 
-export function JournalNote({ entry }: { entry: Activity }) {
+// onChange: tells a list that keeps its own copy of the notes (the Chapters card) about an edit or a
+// delete as soon as it's saved, so it never shows the old note while it reloads.
+export type NoteChange = { deleted: true } | { note: string };
+
+export function JournalNote({ entry, onChange }: { entry: Activity; onChange?: (change: NoteChange) => void }) {
     const [open, setOpen] = useState(false);
     const note = entry.note || "";
 
@@ -27,6 +31,7 @@ export function JournalNote({ entry }: { entry: Activity }) {
         if (!ok) return;
         try {
             await deleteEntryNote(String(entry.id));
+            onChange?.({ deleted: true });
             toast("Note deleted");
         } catch (error) {
             toast((error as Error).message, { error: true });
@@ -42,7 +47,7 @@ export function JournalNote({ entry }: { entry: Activity }) {
             {open
                 ? (
                     <span className="session-actions">
-                        <button type="button" className="link-btn" onClick={() => openEditNote(entry)}>Edit</button>
+                        <button type="button" className="link-btn" onClick={() => openEditNote(entry, (note) => onChange?.({ note }))}>Edit</button>
                         <button type="button" className="link-btn danger-link" onClick={remove}>Delete</button>
                     </span>
                 )
@@ -51,11 +56,11 @@ export function JournalNote({ entry }: { entry: Activity }) {
     );
 }
 
-export function openEditNote(entry: Activity) {
-    openDialog((done) => <EditNoteDialog entry={entry} onClose={done} />);
+export function openEditNote(entry: Activity, onSaved?: (note: string) => void) {
+    openDialog((done) => <EditNoteDialog entry={entry} onSaved={onSaved} onClose={done} />);
 }
 
-function EditNoteDialog({ entry, onClose }: { entry: Activity; onClose: () => void }) {
+function EditNoteDialog({ entry, onSaved, onClose }: { entry: Activity; onSaved?: (note: string) => void; onClose: () => void }) {
     const [text, setText] = useState(entry.note || "");
     const field = useRef<HTMLTextAreaElement>(null);
     return (
@@ -65,6 +70,7 @@ function EditNoteDialog({ entry, onClose }: { entry: Activity; onClose: () => vo
                 if (!note) return setError("Write a note, or use Delete to remove it."), false;
                 if (note === (entry.note || "").trim()) return; // nothing changed
                 await editEntryNote(String(entry.id), note);
+                onSaved?.(note);
                 toast("Note updated");
             }}>
             <div className="stack">

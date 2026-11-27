@@ -1,7 +1,8 @@
 // "Log your reading": pick a book you're reading, then save a journal entry (note + date + the page
 // you're on). Saving moves the book's progress on and feeds the streak and recent entries.
 // Same behaviour and markup as public/js/logReading.js.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../../api";
 import type { Book } from "../../api/types";
 import { Cover, ProgressBar, StatusBadge } from "../../components/BookBits";
 import { fmt } from "../../components/format";
@@ -12,15 +13,16 @@ import { today } from "../../domain/dates";
 import { percent } from "../../domain/readingRules";
 import { getBook, getState, nextUpBooks, updateBook } from "../../store/store";
 
-export function openLogReading(bookId?: string) {
+// chapter: open with that chapter already picked (the book page's "Add a note" on a chapter).
+export function openLogReading(bookId?: string, { chapter = null }: { chapter?: number | null } = {}) {
     if (!getState().loaded) return toast("Your shelf is still loading…");
-    if (bookId) return openLogForm(getBook(bookId));
+    if (bookId) return openLogForm(getBook(bookId), chapter);
     openDialog((done) => <PickDialog onClose={done} />);
 }
 
-function openLogForm(book: Book | undefined) {
+function openLogForm(book: Book | undefined, chapter: number | null = null) {
     if (!book) return toast("That book isn't on your shelf anymore.", { error: true });
-    openDialog((done) => <LogForm book={book} onClose={done} />);
+    openDialog((done) => <LogForm book={book} initialChapter={chapter} onClose={done} />);
 }
 
 // Books on the go first; if there are none, offer the Next Up / To Be Read pile to start one.
@@ -75,12 +77,21 @@ function PickDialog({ onClose }: { onClose: () => void }) {
     );
 }
 
-function LogForm({ book, onClose }: { book: Book; onClose: () => void }) {
+function LogForm({ book, initialChapter, onClose }: { book: Book; initialChapter: number | null; onClose: () => void }) {
     const total = book.totalPages || 0;
     const [page, setPage] = useState(String(book.currentPage || 0));
     const [note, setNote] = useState("");
     const [date, setDate] = useState(today);
+    const [chapter, setChapter] = useState<number | null>(initialChapter && book.chapterCount && initialChapter <= book.chapterCount ? initialChapter : null);
     const noteRef = useRef<HTMLTextAreaElement>(null);
+    // Chapters that already have notes get a dot in the picker.
+    const [noted, setNoted] = useState<Set<number>>(new Set());
+    useEffect(() => {
+        if (!book.chapterCount) return;
+        let live = true;
+        api.getChapterNotes(book.id).then((list) => { if (live) setNoted(new Set(list.map((a) => Number(a.chapter)))); }).catch(() => {});
+        return () => { live = false; };
+    }, [book.id, book.chapterCount]);
 
     const n = Number(page) || 0;
     const read = n - book.currentPage;
@@ -101,19 +112,34 @@ function LogForm({ book, onClose }: { book: Book; onClose: () => void }) {
                 if (total && value > total) return setError(`This book has ${fmt.num(total)} pages.`), false;
                 if (!date) return setError("Pick the date you read."), false;
                 if (date > today()) return setError("The date can't be in the future."), false;
+                if (chapter && !text) return setError(`Write your note on Chapter ${chapter}, or tap the chapter again to unpick it.`), false;
                 if (value === book.currentPage && !text) return setError("Move your page on or write a note to save an entry."), false;
 
-                const saved = await updateBook(book.id, { currentPage: value }, { session: { date, note: text } });
-                toast(saved.status === "Read" && book.status !== "Read" ? "Finished! Time to write your review 🎉" : "Saved to your journal");
+                const saved = await updateBook(book.id, { currentPage: value }, { session: { date, note: text, chapter } });
+                toast(saved.status === "Read" && book.status !== "Read" ? "Finished! Time to write your review 🎉"
+                    : chapter ? `Saved to Chapter ${chapter}` : "Saved to your journal");
             }}>
             <div className="stack">
                 <div className="log-book">
                     <Cover book={book} size="sm" />
                     <div><strong>{book.title}</strong><small>{book.author}</small><StatusBadge status={book.status} /></div>
                 </div>
+                {book.chapterCount
+                    ? (
+                        <div className="field">
+                            <span className="label" id="logChapterLabel">Chapter <span className="label-hint">(optional: tap one to file your note under it)</span></span>
+                            <div className="chapter-picks" role="group" aria-labelledby="logChapterLabel">
+                                {Array.from({ length: book.chapterCount }, (_, i) => i + 1).map((n) => (
+                                    <button key={n} type="button" className={`chapter-pick${noted.has(n) ? " has-notes" : ""}`} aria-pressed={chapter === n}
+                                        aria-label={`Chapter ${n}${noted.has(n) ? " (has notes)" : ""}`} onClick={() => setChapter((c) => (c === n ? null : n))}>{n}</button>
+                                ))}
+                            </div>
+                        </div>
+                    )
+                    : null}
                 <div className="log-cols">
                     <div className="field">
-                        <label htmlFor="logNote">Notes</label>
+                        <label htmlFor="logNote">{chapter ? `Notes on Chapter ${chapter}` : "Notes"}</label>
                         <textarea ref={noteRef} className="textarea" id="logNote" rows={5} maxLength={20000} placeholder="Thoughts, feelings, favourite moments, theories…"
                             value={note} onChange={(e) => setNote(e.target.value)} />
                     </div>
